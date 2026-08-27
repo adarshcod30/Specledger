@@ -470,11 +470,10 @@ reverse proxy — none of that has been done. If a live demo is needed for
 judging, the fastest path is `uvicorn api.main:app --host 0.0.0.0 --port
 $PORT` on any of the above.
 
-**GitHub repository "About" panel** — this README is edited via the
-Claude Code CLI, which doesn't have GitHub API/`gh` credentials to update the
-repo sidebar (description, website link, topics) directly. Paste this in at
-[github.com/adarshcod30/Unisol](https://github.com/adarshcod30/Unisol) → the
-gear icon next to "About":
+**GitHub repository "About" panel** — the sidebar (description, website link,
+topics) is set from the repo settings UI, not from this file. Paste this in
+at [github.com/adarshcod30/Unisol](https://github.com/adarshcod30/Unisol) →
+the gear icon next to "About":
 
 > **Description:** Chain of custody for AI-generated product data — evidence-gated extraction, calibrated confidence, and selective abstention for industrial product intelligence.
 > **Topics:** `ai`, `llm`, `product-intelligence`, `data-enrichment`, `fastapi`, `aws-bedrock`, `evidence-verification`, `human-in-the-loop`

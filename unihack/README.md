@@ -121,9 +121,10 @@ claims, deliberately not conflated:
 ## A real finding, not a limitation of this code
 
 Frigidaire's site (`frigidaire.com`) is unreachable from every fetch
-mechanism tried — direct HTTP, and separately Claude's own WebFetch tool —
-confirmed independently, both timing out mid-TLS-handshake or on the request
-itself. LG and KitchenAid return outright `403` to a correctly-headered GET.
+mechanism tried — a direct HTTP request and, separately, a second independent
+fetch path — confirmed independently, both timing out mid-TLS-handshake or on
+the request itself. LG and KitchenAid return outright `403` to a
+correctly-headered GET.
 This is Akamai/Cloudflare-class bot management on the manufacturer's own
 infrastructure, not a gap in this pipeline. **Both known ground-truth rows
 are exactly this case** — Frigidaire is blocked outright; Whirlpool's search

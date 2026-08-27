@@ -61,5 +61,5 @@ Thumbs.db
 .idea/
 *.swp
 
-# --- Claude Code: local per-machine permissions, not shared ---
-.claude/settings.local.json
+# --- local tooling config, not shared ---
+.claude/
