@@ -101,11 +101,26 @@ main{display:grid;grid-template-columns:250px minmax(430px,1fr) minmax(360px,540
 .colhead{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
 h3{margin:0;font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:var(--faint);font-weight:700}
 
+/* ---------- search ---------- */
+.searchbox{position:relative;margin-bottom:10px}
+.searchbox svg{position:absolute;left:10px;top:50%;transform:translateY(-50%);color:var(--faint);pointer-events:none}
+.searchbox input{width:100%;padding:8px 30px 8px 30px;border-radius:9px;border:1px solid var(--line2);
+  background:var(--panel);font:inherit;font-size:12.5px;color:var(--fg);transition:.15s}
+.searchbox input::placeholder{color:var(--faint)}
+.searchbox input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(37,99,235,.12)}
+.searchbox .clear{position:absolute;right:6px;top:50%;transform:translateY(-50%);width:20px;height:20px;
+  border:none;background:var(--panel3);border-radius:50%;color:var(--dim);cursor:pointer;
+  display:none;align-items:center;justify-content:center;padding:0}
+.searchbox.has-text .clear{display:flex}
+.matchcount{font-size:10.5px;color:var(--faint);margin:2px 2px 8px;text-align:right}
+.nomatch{padding:24px 10px;text-align:center;color:var(--faint);font-size:12px}
+
 /* ---------- catalog list ---------- */
 .skucard{padding:10px 11px;border-radius:10px;cursor:pointer;border:1px solid var(--line);
   margin-bottom:6px;transition:.15s;background:var(--panel);box-shadow:var(--shadow-sm)}
 .skucard:hover{border-color:var(--line2);transform:translateY(-1px);box-shadow:0 4px 12px rgba(23,33,55,.08)}
 .skucard.on{background:#eef4ff;border-color:var(--accent);box-shadow:0 0 0 1px rgba(37,99,235,.18)}
+.skucard mark{background:#fde68a;color:inherit;border-radius:2px;padding:0 1px}
 .skucard .top{display:flex;align-items:center;justify-content:space-between}
 .skucard .id{font-family:var(--mono);font-size:13px;font-weight:700}
 .skucard .brand{font-size:10.5px;color:var(--dim);background:var(--panel2);border:1px solid var(--line2);
@@ -261,6 +276,34 @@ h2.sec svg{color:var(--accent2)}
 .empty b{color:var(--dim);font-size:13px;font-weight:600}
 .celebrate{color:var(--ok)}
 
+/* ---------- focus-visible: keyboard users get a deliberate ring, mouse users
+   get nothing extra -- the design system's own accent color, not the browser
+   default outline that clashes with custom-styled cards and buttons ---------- */
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
+.skucard:focus-visible,.attr:focus-visible,.qitem:focus-visible{outline-offset:-2px}
+button:focus-visible{outline-offset:1px}
+
+/* ---------- content transitions: swapped panels fade+lift in instead of
+   popping instantly, so navigation reads as considered rather than abrupt ---------- */
+@keyframes panelIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+.panel-in{animation:panelIn .18s ease-out}
+
+/* ---------- skeleton: shown the instant a click fires, replaced the instant
+   data arrives -- so a slow network never reads as an unresponsive click ---------- */
+.skel{border-radius:10px;background:linear-gradient(90deg,var(--panel2) 25%,var(--line) 37%,var(--panel2) 63%);
+  background-size:400% 100%;animation:skel 1.3s ease-in-out infinite}
+@keyframes skel{0%{background-position:100% 0}100%{background-position:0 0}}
+.skel-card{height:64px;margin-bottom:6px}
+.skel-line{height:14px;margin-bottom:8px}
+
+/* ---------- copy button on the evidence quote ---------- */
+.quotecard{padding-right:38px !important}
+.copybtn{position:absolute;top:8px;right:8px;width:26px;height:26px;border-radius:7px;
+  border:1px solid #f1e2a8;background:rgba(255,255,255,.6);color:#8a7328;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;transition:.15s}
+.copybtn:hover{background:#fff;color:#4a4020}
+.copybtn.copied{color:var(--ok);border-color:var(--ok-line);background:var(--ok-dim)}
+
 /* ---------- modal ---------- */
 .modalbg{position:fixed;inset:0;background:rgba(30,41,59,.42);backdrop-filter:blur(3px);z-index:50;
   display:flex;align-items:center;justify-content:center;padding:24px;opacity:0;pointer-events:none;transition:opacity .18s}
@@ -323,6 +366,8 @@ h2.sec svg{color:var(--accent2)}
 <symbol id="i-send" viewBox="0 0 24 24"><path d="M4 4 20 12 4 20 8 12 Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
 <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="1.8"/><polyline points="12,7 12,12 16,14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
 <symbol id="i-building" viewBox="0 0 24 24"><rect x="4" y="3" width="10" height="18" fill="none" stroke="currentColor" stroke-width="1.7"/><rect x="14" y="9" width="6" height="12" fill="none" stroke="currentColor" stroke-width="1.7"/><line x1="7" y1="7" x2="7" y2="7.01" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><line x1="10.5" y1="7" x2="10.5" y2="7.01" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><line x1="7" y1="11" x2="7" y2="11.01" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><line x1="10.5" y1="11" x2="10.5" y2="11.01" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><line x1="7" y1="15" x2="7" y2="15.01" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/><line x1="10.5" y1="15" x2="10.5" y2="15.01" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></symbol>
+<symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="13" height="13" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
+<symbol id="i-x" viewBox="0 0 24 24"><line x1="6" y1="6" x2="18" y2="18" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/><line x1="18" y1="6" x2="6" y2="18" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
 </defs>
 </svg>
 
@@ -359,11 +404,25 @@ h2.sec svg{color:var(--accent2)}
 <div class="stats" id="stats"></div>
 
 <main id="v-cat">
-  <div class="col"><div class="colhead"><h3>Catalog</h3></div><div id="skus"></div></div>
+  <div class="col">
+    <div class="colhead"><h3>Catalog</h3></div>
+    <div class="searchbox" id="searchbox">
+      <svg width="14" height="14"><use href="#i-search"/></svg>
+      <input id="skuSearch" type="text" placeholder="Search part number or brand…" autocomplete="off"
+             aria-label="Search catalog" oninput="filterCatalog()">
+      <button class="clear" onclick="clearSearch()" title="Clear search" aria-label="Clear search">
+        <svg width="11" height="11"><use href="#i-x"/></svg></button>
+    </div>
+    <div class="matchcount" id="skuCount"></div>
+    <div id="skus">
+      <div class="skel skel-card"></div><div class="skel skel-card"></div><div class="skel skel-card"></div>
+    </div>
+  </div>
   <div class="col"><div class="colhead"><h3 id="rec-h">Record</h3></div><div id="rec"></div></div>
   <div class="col"><div class="colhead"><h3>Evidence</h3></div><div id="ev">
     <div class="empty"><svg width="34" height="34"><use href="#i-search"/></svg>
-      <b>No attribute selected</b>Click any attribute on the left to see the exact source sentence that justifies it.</div>
+      <b>No attribute selected</b>Click any attribute on the left to see the exact source sentence that justifies it.
+      <span class="faint" style="font-size:11px">Tip: use ↑ ↓ to move between attributes, Enter to open one.</span></div>
   </div></div>
 </main>
 
@@ -372,7 +431,9 @@ h2.sec svg{color:var(--accent2)}
     <div class="colhead"><h3>Review queue</h3></div>
     <div class="qexplain">Ranked by <b>risk = uncertainty × safety weight × conflict weight</b> — items where a wrong
       value would do the most damage float to the top, not items that simply arrived first.</div>
-    <div class="qgrid" id="queue"></div>
+    <div class="qgrid" id="queue">
+      <div class="skel skel-card"></div><div class="skel skel-card"></div><div class="skel skel-card"></div>
+    </div>
   </div>
   <div class="col"><div class="colhead"><h3>Evidence</h3></div><div id="qev">
     <div class="empty"><svg width="34" height="34"><use href="#i-inbox"/></svg>
@@ -380,7 +441,10 @@ h2.sec svg{color:var(--accent2)}
   </div></div>
 </main>
 
-<div class="wide" id="v-m" style="display:none"><div id="metrics"></div></div>
+<div class="wide" id="v-m" style="display:none"><div id="metrics">
+  <div class="skel skel-line" style="width:60%;height:20px"></div>
+  <div class="skel skel-card" style="height:90px;margin-top:16px"></div>
+</div></div>
 
 <div class="modalbg" id="helpbg" onclick="if(event.target===this)closeHelp()">
   <div class="modal">
@@ -442,6 +506,34 @@ function riskBand(r){ return r>=1.2?'high':r>=0.5?'med':'low'; }
 function openHelp(){ $('#helpbg').classList.add('show'); }
 function closeHelp(){ $('#helpbg').classList.remove('show'); }
 document.addEventListener('keydown', e=>{ if(e.key==='Escape') closeHelp(); });
+
+function markMatch(text, q){
+  const s = esc(text);
+  if(!q) return s;
+  const i = s.toLowerCase().indexOf(q.toLowerCase());
+  return i<0 ? s : s.slice(0,i)+'<mark>'+s.slice(i,i+q.length)+'</mark>'+s.slice(i+q.length);
+}
+
+// A single delegated keydown listener per list, attached once to the static
+// parent (innerHTML swaps don't lose it) -- Up/Down moves a real DOM focus
+// between items so :focus-visible styling and screen readers both track it
+// correctly, Enter/Space activates whatever the item's own click handler does.
+function makeListNavigable(containerEl, itemSelector){
+  containerEl.addEventListener('keydown', e=>{
+    if(!['ArrowDown','ArrowUp','Enter',' '].includes(e.key)) return;
+    const items = [...containerEl.querySelectorAll(itemSelector)];
+    if(!items.length) return;
+    const cur = document.activeElement;
+    let idx = items.indexOf(cur);
+    if(e.key==='Enter' || e.key===' '){
+      if(idx>=0){ e.preventDefault(); items[idx].click(); }
+      return;
+    }
+    e.preventDefault();
+    if(idx<0) idx = 0; else idx = e.key==='ArrowDown' ? Math.min(idx+1, items.length-1) : Math.max(idx-1, 0);
+    items[idx].focus();
+  });
+}
 
 function toast(msg, kind='ok'){
   const el=document.createElement('div');
@@ -505,25 +597,70 @@ async function boot(){
       <b>${v??'—'}</b><i>${k}</i></div>`).join('');
 
   RECS = await api('/api/records');
-  $('#skus').innerHTML = RECS.map(r=>{
+  renderSkuList(RECS, '');
+  // Attached once, here -- these three containers persist across every
+  // re-render (only their innerHTML changes), so wiring keyboard nav inside
+  // the render functions themselves would stack a fresh listener on every
+  // single click.
+  makeListNavigable($('#skus'), '.skucard');
+  makeListNavigable($('#rec'), '.attr');
+  makeListNavigable($('#queue'), '.qitem');
+  if(RECS.length) openSku(RECS[0].sku);
+
+  // First-ever visit: open the Help modal once so a new user isn't left to
+  // find "How it works" on their own. Never again after that -- localStorage
+  // can throw in a locked-down context (private browsing, some embeds), so
+  // this degrades to "just don't auto-open" rather than breaking boot.
+  try{
+    if(!localStorage.getItem('specledger_seen_help')){
+      localStorage.setItem('specledger_seen_help','1');
+      setTimeout(openHelp, 500);
+    }
+  }catch(e){}
+}
+
+function renderSkuList(list, q){
+  $('#skus').innerHTML = list.length ? list.map(r=>{
     const frac = r.attributes ? r.published/r.attributes : 0;
-    return `<div class="skucard" id="s-${r.sku}" onclick="openSku('${r.sku}')">
-      <div class="top"><span class="id">${esc(r.mpn)}</span><span class="brand">${esc(r.brand)}</span></div>
+    return `<div class="skucard" id="s-${r.sku}" tabindex="0" onclick="openSku('${r.sku}')">
+      <div class="top"><span class="id">${markMatch(r.mpn,q)}</span><span class="brand">${markMatch(r.brand,q)}</span></div>
       <div class="meta">
         <div class="mini-bar"><i style="width:${(frac*100).toFixed(0)}%"></i></div>
         <span class="frac">${r.published}/${r.attributes}</span>
       </div>
       ${r.conflicts ? `<div class="warnpip" style="margin-top:6px"><svg width="11" height="11"><use href="#i-alert"/></svg>${r.conflicts} conflict${r.conflicts>1?'s':''}</div>` : ''}
     </div>`;
-  }).join('');
-  if(RECS.length) openSku(RECS[0].sku);
+  }).join('') : `<div class="nomatch">No parts match “${esc(q)}”.</div>`;
+  if(CUR) $('#s-'+CUR)?.classList.add('on');
+}
+
+function filterCatalog(){
+  const q = $('#skuSearch').value.trim();
+  $('#searchbox').classList.toggle('has-text', !!q);
+  const list = q ? RECS.filter(r => r.mpn.toLowerCase().includes(q.toLowerCase())
+                                  || r.brand.toLowerCase().includes(q.toLowerCase())) : RECS;
+  renderSkuList(list, q);
+  $('#skuCount').textContent = q ? `${list.length} of ${RECS.length}` : '';
+}
+function clearSearch(){
+  $('#skuSearch').value = '';
+  $('#skuSearch').focus();
+  filterCatalog();
 }
 
 async function openSku(sku){
   CUR=sku;
   document.querySelectorAll('.skucard').forEach(e=>e.classList.remove('on'));
   $('#s-'+sku)?.classList.add('on');
+  // Skeleton the instant the click fires -- on a slow connection the old
+  // record would otherwise sit there looking clicked-but-unresponsive for
+  // however long the fetch takes.
+  $('#rec').innerHTML = `<div class="skel skel-card" style="height:150px"></div>
+    <div class="skel skel-card"></div><div class="skel skel-card"></div><div class="skel skel-card"></div>`;
+  $('#ev').innerHTML = `<div class="empty"><svg width="34" height="34"><use href="#i-search"/></svg>
+    <b>No attribute selected</b>Click any attribute on the left to see the exact source sentence that justifies it.</div>`;
   const r = await api('/api/records/'+sku);
+  if(CUR !== sku) return;               // a newer click has already superseded this one
   $('#rec-h').textContent = `${r.brand} ${r.mpn}`;
 
   const score = r.readiness.score;
@@ -532,7 +669,7 @@ async function openSku(sku){
 
   const rowsHtml = Object.entries(r.attributes).map(([k,a])=>{
     const conf = Math.max(0, Math.min(1, a.confidence));
-    return `<div class="attr" id="a-${k}" onclick="showEv('${sku}','${k}')">
+    return `<div class="attr" id="a-${k}" tabindex="0" onclick="showEv('${sku}','${k}')">
       <div class="name-wrap">
         <div class="name">${a.safety_critical?`<svg class="safeicon" width="14" height="14"><use href="#i-shield"/></svg>`:''}${esc(a.label)}</div>
         <div class="key">${k}</div>
@@ -550,7 +687,7 @@ async function openSku(sku){
   }).join('');
 
   $('#rec').innerHTML = `
-    <div class="card">
+    <div class="card panel-in">
       <h3 style="margin-bottom:6px">customer-supplied input</h3>
       <div class="inputquote">“${esc(r.input_description)}”</div>
       <div class="chiprow">
@@ -572,7 +709,7 @@ async function openSku(sku){
         </div>
       </div>
     </div>
-    <div class="attrlist">${rowsHtml}</div>`;
+    <div class="attrlist panel-in">${rowsHtml}</div>`;
 }
 
 function reasonIcon(x){
@@ -585,7 +722,9 @@ async function showEv(sku, attr, target='#ev'){
   CURATTR=attr;
   document.querySelectorAll('.attr').forEach(e=>e.classList.remove('on'));
   $('#a-'+attr)?.classList.add('on');
+  $(target).innerHTML = `<div class="skel skel-line" style="width:60%"></div><div class="skel skel-card" style="height:90px"></div><div class="skel skel-line" style="width:40%"></div>`;
   const r = await api('/api/records/'+sku); const a = r.attributes[attr];
+  if(CURATTR !== attr) return;
   const e = a.evidence;
 
   const trail = e ? `<div class="trail">
@@ -594,7 +733,10 @@ async function showEv(sku, attr, target='#ev'){
       <span class="arrow">→</span><span class="seg">chars ${e.char_start}–${e.char_end}</span>
       <span class="matchbadge ${e.match_mode}">${e.match_mode}</span>
     </div>
-    <div class="quotecard"><div class="qtext">${esc(e.quote)}</div></div>`
+    <div class="quotecard"><div class="qtext">${esc(e.quote)}</div>
+      <button class="copybtn" onclick="copyQuote(this,'${attr}')" title="Copy quote" aria-label="Copy quote">
+        <svg width="13" height="13"><use href="#i-copy"/></svg></button>
+    </div>`
     : `<div class="noev"><svg width="16" height="16"><use href="#i-x-circle"/></svg>No evidence — nothing survived the verification gate for this attribute.</div>`;
 
   const why = (a.reasons||[]).map(x=>{
@@ -609,7 +751,7 @@ async function showEv(sku, attr, target='#ev'){
       `<div class="callout warn"><svg width="15" height="15"><use href="#i-x-circle"/></svg><span>${esc(q)}</span></div>`).join('') : '';
 
   $(target).innerHTML = `
-    <div class="card">
+    <div class="card panel-in">
       <div class="evhead">
         <div><div class="evname">${esc(a.label)}</div><div class="evkey">${attr}</div></div>
         <span class="pill ${a.decision}"><span class="dot"></span>${a.decision.replace('_',' ')}</span>
@@ -623,10 +765,25 @@ async function showEv(sku, attr, target='#ev'){
         <button class="actbtn reject" onclick="act('${sku}','${attr}','REJECT')"><svg width="14" height="14"><use href="#i-x-circle"/></svg>Reject</button>
       </div>
     </div>
-    ${e?`<div class="pgwrap">
+    ${e?`<div class="pgwrap panel-in">
         <img src="/api/evidence/${sku}/${attr}.png" alt="source page ${e.page} with the supporting sentence highlighted">
         <div class="pgcap"><span>${esc(e.doc_id)}</span><span>page ${e.page}</span></div>
       </div>`:''}`;
+}
+
+function copyQuote(btn, attr){
+  const card = btn.closest('.quotecard');
+  const text = card?.querySelector('.qtext')?.textContent || '';
+  if(!text) return;
+  navigator.clipboard.writeText(text).then(()=>{
+    btn.classList.add('copied');
+    btn.innerHTML = '<svg width="13" height="13"><use href="#i-check-circle"/></svg>';
+    toast('Quote copied to clipboard','ok');
+    setTimeout(()=>{
+      btn.classList.remove('copied');
+      btn.innerHTML = '<svg width="13" height="13"><use href="#i-copy"/></svg>';
+    }, 1400);
+  }).catch(()=> toast('Could not copy — clipboard unavailable','bad'));
 }
 
 async function act(sku, attribute, action){
@@ -643,7 +800,7 @@ async function loadQueue(){
   const q = await api('/api/queue');
   $('#queue').innerHTML = q.length ? q.map((i,n)=>{
     const band = riskBand(i.risk);
-    return `<div class="qitem risk-${band}" id="q-${n}" onclick="pickQ(${n},'${i.sku}','${i.attribute}')">
+    return `<div class="qitem risk-${band} panel-in" id="q-${n}" tabindex="0" onclick="pickQ(${n},'${i.sku}','${i.attribute}')">
       <div class="qtop">
         <div class="qtitle">${esc(i.brand)} ${esc(i.mpn)} <span class="attrname">— ${i.attribute.replace(/_/g,' ')}</span></div>
         <span class="riskchip ${band}">risk ${i.risk.toFixed(2)}</span>
@@ -705,7 +862,7 @@ async function loadMetrics(){
   });
 
   $('#metrics').innerHTML = `
-    <div style="display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:8px">
+    <div class="panel-in" style="display:flex;align-items:baseline;justify-content:space-between;flex-wrap:wrap;gap:8px">
       <div><h2 class="sec" style="margin-top:0"><svg width="16" height="16"><use href="#i-layers"/></svg>Naive extraction vs. SpecLedger</h2>
       <div class="subnote" style="margin-top:-8px">Measured on ${m.corpus.skus} SKUs across ${m.corpus.documents} real vendor
         datasheets (${(m.corpus.product_classes||[]).join(', ')}), graded against a hand-transcribed gold set. Both arms
