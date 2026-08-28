@@ -41,6 +41,7 @@ class SourceDoc:
     fetched_at: str = ""
     page_count: int = 0
     title: str = ""
+    covers: tuple = ()      # part numbers this document tabulates, if known
 
     @property
     def tier(self) -> int:

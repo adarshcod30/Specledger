@@ -133,6 +133,7 @@ def load_doc(doc_id: str) -> SourceDoc:
         doc_id=doc_id, url=m.url, publisher=m.publisher, authority=m.authority,
         local_path=str(p), sha256=lock.get(doc_id, {}).get("sha256", sha256_file(p)),
         fetched_at=lock.get(doc_id, {}).get("fetched_at", ""), title=m.title,
+        covers=m.covers,
     )
 
 

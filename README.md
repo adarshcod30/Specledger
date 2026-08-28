@@ -7,11 +7,12 @@ to. Where a value can't be verified, the system says so and routes it to a
 human — instead of guessing and hoping.
 
 <p>
-<img alt="tests" src="https://img.shields.io/badge/tests-48%20passing-158a4a?style=flat-square">
+<a href="https://github.com/adarshcod30/Unisol/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/adarshcod30/Unisol/actions/workflows/ci.yml/badge.svg"></a>
+<img alt="tests" src="https://img.shields.io/badge/tests-51%20passing-158a4a?style=flat-square">
 <img alt="python" src="https://img.shields.io/badge/python-3.13-2563eb?style=flat-square">
 <img alt="llm" src="https://img.shields.io/badge/LLM-Amazon%20Nova%20Lite%20(Bedrock)-0891b2?style=flat-square">
 <img alt="license" src="https://img.shields.io/badge/license-MIT-8b93a1?style=flat-square">
-<img alt="status" src="https://img.shields.io/badge/status-runs%20locally-b45309?style=flat-square">
+<img alt="pip install" src="https://img.shields.io/badge/pip%20install--e-.-2563eb?style=flat-square">
 </p>
 
 Team **Unisol**.
@@ -22,6 +23,7 @@ Team **Unisol**.
 
 - [The problem, in one real example](#the-problem-in-one-real-example)
 - [Why this repo has two projects in it](#why-this-repo-has-two-projects-in-it)
+- [Using SpecLedger as a library](#using-specledger-as-a-library)
 - [Part 1 — SpecLedger: verifiable product intelligence](#part-1--specledger-verifiable-product-intelligence)
   - [Architecture](#architecture)
   - [What each piece does, and why it exists](#what-each-piece-does-and-why-it-exists)
@@ -76,6 +78,85 @@ values are safe to publish unreviewed, and proves it with a citation.**
 `unihack/extract.py` imports directly from `specledger/llm.py` — the two
 projects share one Bedrock/Nova Lite credential path and one evidence-gate
 contract. See [How things connect](#how-the-llm-fits-in--and-why-the-architecture-doesnt-depend-on-it).
+
+---
+
+## Using SpecLedger as a library
+
+Both projects above run against a fixed demo corpus. `specledger/` itself
+doesn't have to: `pipeline.enrich()` accepts documents you supply directly,
+so you can point it at your own catalog instead of forking `corpus.py`.
+Everything below runs with no AWS credentials and no network access — the
+deterministic extractor panel (`table_column`, `range`, `inline_spec`) needs
+neither; the LLM extractor is opt-in, not required.
+
+```bash
+pip install -e .
+```
+
+```python
+from specledger.catalog import InputSKU
+from specledger.confidence import ConfidenceModel
+from specledger.extract import DETERMINISTIC
+from specledger.ingest import IngestedDoc, PageSpan
+from specledger.models import SourceDoc
+from specledger.pipeline import enrich
+from specledger.schema import AttributeSpec, ProductClass, register
+
+# 1. Define what you're extracting -- this is the extension point, additive,
+#    no library source to edit.
+register(ProductClass(
+    key="WIDGET", label="Widget",
+    attributes=[AttributeSpec("voltage_rating", "Voltage Rating", "number", "V",
+                               required=True, aliases=("Voltage Rating",),
+                               plausible_min=1, plausible_max=100)],
+))
+
+# 2. Wrap a document you already have as text -- a scraped page, an OCR'd
+#    PDF, an HTML datasheet. No corpus.py involved.
+text = "ACME WIDGET-9000\nVoltage Rating: 12 V\n"
+src = SourceDoc(doc_id="my-doc", url="", publisher="Acme", authority="MFR_DATASHEET",
+                 local_path="", sha256="", title="Acme Widget-9000 Datasheet",
+                 covers=("WIDGET-9000",))
+doc = IngestedDoc(src, text, [PageSpan(page=1, char_start=0, char_end=len(text),
+                                        width=0, height=0)])
+
+# 3. Enrich. documents=/known_parts= are what bypass the demo corpus.
+sku = InputSKU("SKU-1", "WIDGET-9000", "Acme", "General purpose widget", "WIDGET")
+record = enrich(sku, model=ConfidenceModel(), extractors=DETERMINISTIC,
+                documents=[doc], known_parts={"WIDGET-9000"})
+
+attr = record.attributes["voltage_rating"]
+print(attr.value, attr.unit, attr.decision)        # 12.0 V AUTO_PUBLISH
+print(attr.evidence.verified, attr.evidence.quote)  # True 'Voltage Rating: 12 V'
+```
+
+That example is [tests/test_library_api.py](tests/test_library_api.py) —
+copied from the actual test that runs in CI, not a doc-only snippet that
+quietly bit-rots.
+
+A few things worth knowing before you build on this:
+
+- **Your own LLM backend.** `specledger.llm.LLMBackend` is the `Protocol`
+  `LLMExtractor` expects — implement `.call(prompt, temperature, *, system=,
+  tool_name=, tool_desc=, tool_schema=)` however you like and pass it to
+  `panel(backend=your_backend)` or `pipeline.enrich(..., extractors=panel(backend=your_backend))`.
+  `specledger.llm.BedrockBackend` is the reference implementation, not a
+  requirement — nothing else in the pipeline knows or cares which backend
+  produced a candidate, since every candidate is re-verified against the
+  document regardless of source.
+- **Your own calibrator.** `ConfidenceModel().fit(X, y, safety_mask=...)` is
+  already generic; `confidence.build_training_set(rows)` turns your own
+  `(ResolvedAttribute, is_correct)` labels into the `(X, y, safety_mask)`
+  arrays it wants, so you don't have to reverse-engineer `featurize()`
+  yourself. Until you've fit one, `ConfidenceModel()` runs on a readable,
+  hand-set cold-start prior instead of failing closed.
+- **What you don't get for free.** The document-authenticity guardrails —
+  contamination detection, section authority, physics rules — are tuned for
+  the two built-in product classes' failure modes. A new domain will surface
+  its own version of the "wrong table column" trap this project was built
+  around; the evidence-gate and calibration machinery transfers, the
+  specific guard heuristics may need their own tuning.
 
 ---
 
@@ -298,7 +379,7 @@ specific reason recorded — never left silently blank, never fabricated.
 | Storage | SQLite (via `sqlite3`) | Zero-infrastructure — a judge clones the repo and runs it, no server to provision |
 | Validation | Pydantic | Request/response models in the API layer |
 | Config | `python-dotenv` | `.env` → `os.environ`, gitignored |
-| Testing | pytest | 48 tests, 1.4s wall clock, hermetic (see [Testing](#testing)) |
+| Testing | pytest | 51 tests, 1.4s wall clock, hermetic (see [Testing](#testing)) |
 | Frontend | Vanilla HTML/CSS/JS, one file, no framework, no build step | The deliverable has to run with `make run` and nothing else |
 | Live search (`unihack/`) | DuckDuckGo's HTML endpoint, no API key | Resolves a brand's manufacturer domain from a bare model number at run time — not a lookup table |
 
@@ -422,7 +503,7 @@ For the UniHack module specifically:
 ## Testing
 
 ```
-tests/                                42 tests — SpecLedger
+tests/                                45 tests — SpecLedger
 ├── test_evidence_gate.py             6   the central claim: a fabricated
 │                                          citation is never publishable
 ├── test_variant_traps.py             11  the real series-table and
@@ -431,15 +512,18 @@ tests/                                42 tests — SpecLedger
 │                                          the stale-calibrator-model guard
 ├── test_pipeline.py                  7   end-to-end invariants across every
 │                                          record
-└── test_bedrock_contract.py          10  the Bedrock/Nova Lite integration,
-                                           proven without live credentials
-                                           via simulated Converse responses
+├── test_bedrock_contract.py          10  the Bedrock/Nova Lite integration,
+│                                          proven without live credentials
+│                                          via simulated Converse responses
+└── test_library_api.py               3   the "bring your own catalog" seam:
+                                           a document built from a plain
+                                           string, no corpus.py involved
 
 unihack/tests/test_describe.py        6 tests — every description formula
                                        reproduces real ground truth exactly
 ```
 
-**48 tests, 1.4 seconds, zero network calls** — even the Bedrock contract
+**51 tests, 1.4 seconds, zero network calls** — even the Bedrock contract
 tests run hermetically. This mattered in practice: adding live AWS
 credentials to `.env` once silently made the pipeline tests start making real
 network calls (294s instead of 1.3s), because `enrich()` defaulted to the
@@ -487,8 +571,13 @@ the gear icon next to "About":
   unconditionally regardless of the learned weight, but it needs a
   monotonicity constraint at a larger sample size.
 - **Two SpecLedger product classes** (rectifier diodes, linear regulators).
-  The schema registry is the extension point — adding a class is additive,
-  not a rewrite.
+  `schema.register()` is the extension point — adding a class is additive,
+  not a rewrite (see [Using SpecLedger as a library](#using-specledger-as-a-library)).
+- **The library packaging is v0.1 and unpublished** — `pip install -e .`
+  works from a clone; it isn't on PyPI. The pluggable-backend and
+  bring-your-own-document seams are new and covered by exactly three tests
+  (`tests/test_library_api.py`), not the same depth of scrutiny as the
+  demo's own gold-set evaluation.
 - **SQLite, not Postgres.** Deliberate, for a project a judge or reviewer
   must be able to clone and run with zero infrastructure.
 - **`unihack/`'s brand styling and manufacturer-of-record data is verified
@@ -513,7 +602,7 @@ Unisol/
 ├── web/index.html            Review Cockpit — single file, no build step
 ├── eval/run_eval.py           naive-vs-SpecLedger evaluation harness
 ├── data/                      gold set, cache, corpus lock, SQLite DB
-├── tests/                     42 tests
+├── tests/                     45 tests (incl. test_library_api.py)
 ├── unihack/                    the UniHack competition submission
 │   ├── taxonomy.py, brand.py, search.py, source.py, extract.py,
 │   │   describe.py, uom.py, schema.py, pipeline.py, export.py,
@@ -522,6 +611,8 @@ Unisol/
 │   ├── out/                    delivery_format.csv, review_queue.csv
 │   ├── tests/test_describe.py  6 tests
 │   └── README.md                full UniHack writeup
+├── pyproject.toml              `pip install -e .` — specledger/ only
+├── .github/workflows/ci.yml    pytest on every push and PR
 ├── requirements.txt
 ├── Makefile
 ├── .env.example

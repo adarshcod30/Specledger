@@ -20,11 +20,11 @@ from datetime import datetime, timezone
 
 from . import config, corpus, rules, schema
 from .arbitrate import arbitrate_all
-from .catalog import InputSKU, known_parts
+from .catalog import InputSKU, known_parts as _known_parts
 from .confidence import ConfidenceModel
 from .extract import (DETERMINISTIC, InlineSpecExtractor, extract_from_doc)
 from .llm import panel
-from .ingest import ingest
+from .ingest import ingest, IngestedDoc
 from .models import (Candidate, ProductRecord, ResolvedAttribute,
                      DECISION_AUTO, DECISION_REVIEW)
 
@@ -61,35 +61,52 @@ def _apply_brand_authority(cands, doc, sku) -> None:
 
 
 def enrich(sku: InputSKU, model: ConfidenceModel | None = None,
-           mode: str = "specledger", extractors=None) -> ProductRecord:
+           mode: str = "specledger", extractors=None,
+           documents: list[IngestedDoc] | None = None,
+           known_parts: set[str] | None = None) -> ProductRecord:
     """extractors overrides the strategy panel. Defaults to panel(), which
     includes the LLM extractor whenever credentials are configured in the
     environment -- so callers that must stay hermetic (the test suite, notably)
     pass extractors=DETERMINISTIC explicitly rather than relying on ambient
-    env state to decide whether they make live network calls."""
+    env state to decide whether they make live network calls.
+
+    documents/known_parts let a caller bring their own catalog instead of this
+    repo's demo corpus: pass a list of IngestedDoc (see ingest.IngestedDoc --
+    it needs nothing but a SourceDoc, text, and page spans, so it never has to
+    touch corpus.py) and the set of part numbers you know to be distinct
+    products, for the sibling-contamination guard. Leave both None to use the
+    demo corpus exactly as before.
+    """
     model = model or ConfidenceModel.load()
     pclass = schema.get(sku.product_class)
-    kp = known_parts()
+    kp = known_parts if known_parts is not None else _known_parts()
 
     rec = ProductRecord(sku=sku.sku, mpn=sku.mpn, brand=sku.brand,
                         input_description=sku.description,
                         product_class=pclass.key, created_at=_now(),
                         pipeline_version=f"{config.PIPELINE_VERSION}:{mode}")
 
-    doc_ids = corpus.docs_for_part(sku.mpn)
-    if not doc_ids:
+    if documents is not None:
+        docs = documents
+    else:
+        doc_ids = corpus.docs_for_part(sku.mpn)
+        if not doc_ids:
+            rec.notes.append(f"no source document covers {sku.mpn}")
+            return rec
+        docs = [ingest(did) for did in doc_ids]
+
+    if not docs:
         rec.notes.append(f"no source document covers {sku.mpn}")
         return rec
 
     all_cands: list[Candidate] = []
-    for did in doc_ids:
-        d = ingest(did)
+    for d in docs:
         rec.docs.append(d.doc)
         if mode == "naive":
             all_cands.extend(_naive_candidates(d, sku, pclass))
         else:
             got = extract_from_doc(
-                d, sku.mpn, pclass, corpus.BY_ID[did].covers, kp,
+                d, sku.mpn, pclass, d.doc.covers, kp,
                 extractors if extractors is not None else panel())
             _apply_brand_authority(got, d, sku)
             if got and not brand_matches(d.doc.publisher, sku.brand):
@@ -107,7 +124,7 @@ def enrich(sku: InputSKU, model: ConfidenceModel | None = None,
             a = ResolvedAttribute(attribute=spec.name, value=first.value,
                                   unit=first.unit, display=first.display,
                                   evidence=first.evidence, candidates=[first],
-                                  agreeing_sources=1, total_sources=len(doc_ids),
+                                  agreeing_sources=1, total_sources=len(docs),
                                   safety_critical=spec.safety_critical)
             a.confidence, a.decision = 1.0, DECISION_AUTO      # trusts everything
             a.reasons.append("naive baseline: first match published unverified")

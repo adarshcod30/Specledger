@@ -82,6 +82,20 @@ _MOUNT = AttributeSpec(
     aliases=("mounting", "mount", "through hole", "surface mount", "SMD", "SMT"),
 )
 
+REGISTRY: dict[str, ProductClass] = {}
+
+
+def register(pclass: ProductClass) -> ProductClass:
+    """Add a product class to the registry. This is the extension point for a
+    caller adding their own product class -- built-in classes below register
+    through this same function rather than pre-populating the dict, so the
+    path a new adopter uses is the exact one this module exercises itself."""
+    if pclass.key in REGISTRY:
+        raise ValueError(f"product class {pclass.key!r} already registered")
+    REGISTRY[pclass.key] = pclass
+    return pclass
+
+
 RECTIFIER_DIODE = ProductClass(
     key="RECTIFIER_DIODE",
     label="Rectifier Diode",
@@ -169,9 +183,8 @@ LINEAR_REGULATOR = ProductClass(
     ],
 )
 
-REGISTRY: dict[str, ProductClass] = {
-    c.key: c for c in (RECTIFIER_DIODE, LINEAR_REGULATOR)
-}
+register(RECTIFIER_DIODE)
+register(LINEAR_REGULATOR)
 
 
 def get(key: str) -> ProductClass:

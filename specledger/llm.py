@@ -22,12 +22,26 @@ from __future__ import annotations
 
 import re
 from collections import Counter
+from typing import Protocol
 
 from . import config
 from .ingest import IngestedDoc
 from .models import Candidate, EvidenceSpan
 from .normalize import normalize_candidate
 from .schema import AttributeSpec
+
+
+class LLMBackend(Protocol):
+    """What LLMExtractor needs from a backend. BedrockBackend below is the
+    built-in implementation; a caller can plug in any other provider by
+    implementing this same call() shape and passing it to panel(backend=...)
+    or LLMExtractor(backend=...) directly -- nothing else in this module
+    needs to change."""
+
+    def call(self, prompt: str, temperature: float, *, system: str | None = None,
+             tool_name: str | None = None, tool_desc: str | None = None,
+             tool_schema: dict | None = None) -> dict | None:
+        ...
 
 TOOL_NAME = "report_attribute"
 TOOL_DESC = "Report one product attribute value with the exact evidence it came from."
@@ -220,12 +234,20 @@ class LLMExtractor:
         return out
 
 
-def panel(include_llm: bool | None = None):
+def panel(include_llm: bool | None = None, backend: LLMBackend | None = None):
     """Strategies to run. The LLM joins the deterministic panel when credentials
-    are configured: it adds recall, and panel agreement adds confidence."""
+    are configured: it adds recall, and panel agreement adds confidence.
+
+    Pass backend= to use any LLMBackend-shaped object instead of the default
+    Bedrock/Nova Lite one -- an explicit backend opts into the LLM strategy
+    even when include_llm is left None and no AWS credentials are present,
+    since passing one is itself a clear signal you want it included."""
     from .extract import DETERMINISTIC
-    use = available() if include_llm is None else include_llm
-    return list(DETERMINISTIC) + ([LLMExtractor()] if use else [])
+    if include_llm is None:
+        use = True if backend is not None else available()
+    else:
+        use = include_llm
+    return list(DETERMINISTIC) + ([LLMExtractor(backend=backend)] if use else [])
 
 
 def selfcheck() -> int:

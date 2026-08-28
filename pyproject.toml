@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "specledger"
+version = "0.1.0"
+description = "Evidence-gated product-data extraction: every published value cites a verbatim quote in a real source document, carries a calibrated confidence score, and abstains rather than guesses."
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.11"
+authors = [{ name = "Team Unisol" }]
+dependencies = [
+    "numpy>=1.26",
+    "pint>=0.23",
+    "pymupdf>=1.24",
+    "httpx>=0.27",
+    "python-dotenv>=1.0",
+]
+
+[project.optional-dependencies]
+# The built-in LLM extractor talks to AWS Bedrock; only needed if you use
+# BedrockBackend (the default) instead of plugging in your own LLMBackend.
+bedrock = ["boto3>=1.34"]
+# Only needed to fit or load a trained ConfidenceModel; the cold-start prior
+# in specledger.confidence works without it.
+calibration = ["scikit-learn>=1.4"]
+dev = ["pytest>=8"]
+
+[project.urls]
+Repository = "https://github.com/adarshcod30/Unisol"
+
+[tool.setuptools.packages.find]
+include = ["specledger*"]

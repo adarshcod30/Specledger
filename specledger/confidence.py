@@ -66,6 +66,27 @@ def featurize(attr: ResolvedAttribute) -> np.ndarray:
     ], dtype=float)
 
 
+def build_training_set(rows) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Turn your own labeled attributes into the (X, y, safety_mask) arrays
+    ConfidenceModel.fit() wants, without reverse-engineering featurize()'s
+    layout yourself. rows is an iterable of (attr, is_correct) or
+    (attr, is_correct, is_safety_critical) -- attr being a ResolvedAttribute
+    you've graded against your own gold values. When is_safety_critical is
+    omitted it's read off attr.safety_critical.
+
+        X, y, safety_mask = build_training_set(my_graded_rows)
+        model = ConfidenceModel().fit(X, y, safety_mask=safety_mask)
+    """
+    X, y, safety = [], [], []
+    for row in rows:
+        attr, correct, *rest = row
+        X.append(featurize(attr))
+        y.append(bool(correct))
+        safety.append(bool(rest[0]) if rest else bool(attr.safety_critical))
+    return (np.array(X, dtype=float), np.array(y, dtype=int),
+            np.array(safety, dtype=bool))
+
+
 # Transparent prior used before any gold set exists. Weights are hand-set and
 # readable on purpose: this is the "no training data yet" cold-start path, and a
 # reviewer should be able to audit it without loading a pickle.
