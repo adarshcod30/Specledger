@@ -84,15 +84,9 @@ def _llm_status():
     # after a key is added to .env until someone remembers the server needs a
     # restart to re-read it.
     live = config.llm_available()
-    if live and config.LLM_BACKEND == "bedrock":
-        label = f"Amazon Nova Lite via Bedrock ({config.AWS_REGION})"
-    elif live:
-        label = f"{config.LLM_MODEL or 'Claude'} via Anthropic API"
-    elif config.LLM_BACKEND == "bedrock":
-        label = "no AWS credentials in .env"
-    else:
-        label = "no ANTHROPIC_API_KEY in .env"
-    return {"enabled": live, "backend": config.LLM_BACKEND, "label": label}
+    label = (f"Amazon Nova Lite via Bedrock ({config.AWS_REGION})" if live
+             else "no AWS credentials in .env")
+    return {"enabled": live, "backend": "bedrock", "label": label}
 
 
 @app.get("/api/ready")

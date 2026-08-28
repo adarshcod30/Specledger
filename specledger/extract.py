@@ -11,8 +11,8 @@ These extractors are precision-first by construction.
   RangeExtractor        "-65 to +150 degC" two-ended ranges (schema-gated).
   InlineSpecExtractor   "Output current: 1.5A" label/value lines, guarded by a
                         sibling-contamination check and a dimensional check.
-  LLMExtractor          Claude structured output, held to the same evidence
-                        contract. Used when an API key is present.
+  LLMExtractor          Amazon Nova Lite structured output, held to the same
+                        evidence contract. Used when AWS credentials are present.
 """
 from __future__ import annotations
 

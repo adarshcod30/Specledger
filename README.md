@@ -147,7 +147,7 @@ sparse SKU (mpn + brand + one marketing line)
 | `specledger/ingest.py` | PDF → text with exact character offsets, page rendering for evidence highlighting | Two jobs deliberately split from `verify.py`: offsets *prove* a quote is real; rendering just *shows* it — mixing them makes both fragile |
 | `specledger/sections.py` | Classifies which datasheet section a span of text came from (Absolute Maximum Ratings vs. a graph's axis labels vs. a test condition) | Without this, a naive extractor reads a **test condition** ("TJ = 100°C") as if it were the part's rated maximum — a real bug this project caught and fixed mid-build |
 | `specledger/extract.py` | Deterministic strategies: series-table column resolution, two-ended ranges, inline label/value pairs | Precision-first by construction — every strategy is allowed to abstain, and abstention is never penalized |
-| `specledger/llm.py` | Amazon Bedrock (Nova Lite) / direct Anthropic API backend, self-consistency sampling | The LLM is a candidate *generator*, not an oracle — this module's job ends the moment it hands a quote to `verify.py` |
+| `specledger/llm.py` | Amazon Bedrock (Nova Lite) backend, self-consistency sampling | The LLM is a candidate *generator*, not an oracle — this module's job ends the moment it hands a quote to `verify.py` |
 | `specledger/verify.py` | The evidence gate: exact / normalized / relocated / not-found matching against the real document bytes | This is the one module every other module answers to. A value that fails here never reaches the catalog |
 | `specledger/normalize.py` | Unit conversion (Pint) and enum canonicalization | "100mA" and "0.1A" must compare as equal, or arbitration can't cluster them |
 | `specledger/arbitrate.py` | Multi-source conflict resolution, weighted by evidence strength and manufacturer authority | Ballot-stuffing guard: the same regex matching 8 times in one PDF is not 8 independent confirmations |
@@ -162,9 +162,8 @@ sparse SKU (mpn + brand + one marketing line)
 ### How the LLM fits in — and why the architecture doesn't depend on it
 
 `specledger/llm.py` talks to **Amazon Nova Lite over AWS Bedrock's Converse
-API** by default (an `SPECLEDGER_LLM_BACKEND=anthropic` fallback exists for
-local development). Two design decisions matter more than the model choice
-itself:
+API** — the only LLM provider this codebase calls. Two design decisions
+matter more than the model choice itself:
 
 1. **The LLM is a candidate generator, never an oracle.** It proposes a value
    and a verbatim quote; `verify.py` re-checks that quote against the actual
@@ -182,12 +181,12 @@ itself:
 
 Because the confidence model's 11 features describe the *evidence*
 (match quality, source authority, agreeing-source count, self-consistency…)
-rather than which model produced it, swapping Nova Lite for Claude or a pure
-regex panel doesn't invalidate anything the calibrator learned. `unihack/`
-proves this in practice — it reuses the exact same `specledger/llm.py`
-backend for a completely different domain, with zero duplicated credential or
-retry logic (`BedrockBackend.call()` accepts an optional system prompt and
-tool schema override specifically so a second domain could share it).
+rather than which model produced it, swapping the LLM for a pure regex panel
+doesn't invalidate anything the calibrator learned. `unihack/` proves this in
+practice — it reuses the exact same `specledger/llm.py` backend for a
+completely different domain, with zero duplicated credential or retry logic
+(`BedrockBackend.call()` accepts an optional system prompt and tool schema
+override specifically so a second domain could share it).
 
 ### Results, measured
 
@@ -294,8 +293,7 @@ specific reason recorded — never left silently blank, never fabricated.
 | PDF parsing | PyMuPDF (`pymupdf`) | Gives character-level bounding boxes — span highlighting in the UI is nearly free |
 | Units | Pint | Don't hand-roll unit conversion; industrial specs use five spellings for one unit |
 | HTTP client | httpx | Used for both PDF fetches and, in `unihack/`, live HTML fetches |
-| LLM (primary) | Amazon Nova Lite via **AWS Bedrock** (`boto3`) | Cost-efficient, and the same account already used elsewhere on this team |
-| LLM (fallback) | Anthropic API (`anthropic`) | Local-dev path when Bedrock isn't configured |
+| LLM | Amazon Nova Lite via **AWS Bedrock** (`boto3`) | The only LLM provider called anywhere in this codebase; cost-efficient, and the same account already used elsewhere on this team |
 | ML | scikit-learn (`LogisticRegression`), numpy, pandas | The whole confidence model is ~200 lines and outperforms trusting a model's self-reported confidence |
 | Storage | SQLite (via `sqlite3`) | Zero-infrastructure — a judge clones the repo and runs it, no server to provision |
 | Validation | Pydantic | Request/response models in the API layer |
@@ -314,14 +312,11 @@ contract as everything else.
 
 | Variable | Default | What it controls |
 |---|---|---|
-| `SPECLEDGER_LLM_BACKEND` | `bedrock` | `bedrock` talks to Nova Lite via AWS; `anthropic` uses the direct API instead |
-| `AWS_ACCESS_KEY_ID` | — | AWS credential (Bedrock backend only) |
-| `AWS_SECRET_ACCESS_KEY` | — | AWS credential (Bedrock backend only) |
+| `AWS_ACCESS_KEY_ID` | — | AWS credential |
+| `AWS_SECRET_ACCESS_KEY` | — | AWS credential |
 | `AWS_SESSION_TOKEN` | — | Only needed for temporary/STS credentials |
 | `AWS_REGION` | `us-east-1` | Must be a region where Bedrock + the chosen model are enabled |
 | `SPECLEDGER_BEDROCK_MODEL` | `us.amazon.nova-lite-v1:0` | Nova Lite needs a **region-prefixed inference profile** for on-demand invocation — the bare foundation-model ID throws `ValidationException` |
-| `ANTHROPIC_API_KEY` | — | Only used when `SPECLEDGER_LLM_BACKEND=anthropic` |
-| `SPECLEDGER_MODEL` | `claude-sonnet-4-5` | Model ID for the Anthropic fallback path |
 | `SPECLEDGER_LLM_SAMPLES` | `3` | Independent samples per extraction; agreement feeds the calibrator as `self_consistency`. `1` disables it |
 | `SPECLEDGER_TARGET_PRECISION` | `0.98` | The precision floor the calibrator solves for on general attributes |
 | `SPECLEDGER_TARGET_PRECISION_SAFETY` | `0.99` | Stricter floor for safety-critical attributes, enforced by a monotonicity constraint (never lower than the general floor) |
@@ -405,10 +400,10 @@ Or all at once: `make demo` (setup → fetch → eval → test → run).
 
 The server opens its port immediately and warms the catalog in a background
 thread; the cockpit shows a real loading state until it's ready instead of
-hanging silently. With no LLM credentials this takes seconds. With Bedrock or
-Anthropic configured, the LLM extractor joins the panel and — because
-self-consistency sampling means real API calls per attribute — the first
-warm-up can take a few minutes on the full catalog. One-time cost per server
+hanging silently. With no AWS credentials this takes seconds. With Bedrock
+configured, the LLM extractor joins the panel and — because self-consistency
+sampling means real API calls per attribute — the first warm-up can take a
+few minutes on the full catalog. One-time cost per server
 start, not per request.
 
 Other targets: `make llm-check` (verifies the configured backend end-to-end

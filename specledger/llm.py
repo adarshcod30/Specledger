@@ -1,11 +1,9 @@
-"""LLM-backed extraction over AWS Bedrock, talking to Amazon Nova Lite by
-default -- the same model AGENTIQ uses. A direct-to-provider API is kept as a
-fallback path for local development, selected via SPECLEDGER_LLM_BACKEND.
+"""LLM-backed extraction over AWS Bedrock, talking to Amazon Nova Lite -- the
+same model AGENTIQ uses. This is the project's only LLM backend: no other
+provider is called anywhere in this codebase.
 
 The LLM is a candidate GENERATOR, not an oracle. It proposes values; verify.py
-decides whether they survive. That separation is the whole architecture, and it
-is what makes the backend swappable: nothing downstream of extract() cares
-whether a candidate came from Nova, Claude, or a regex.
+decides whether they survive. That separation is the whole architecture:
 
   * The model must return a VERBATIM quote, which we then locate ourselves.
   * "NOT_FOUND" is a first-class answer and is never penalised.
@@ -74,8 +72,6 @@ Rules you must never break:
 
 
 # --------------------------------------------------------------------------
-# backends
-# --------------------------------------------------------------------------
 class BedrockBackend:
     """AWS Bedrock Converse API. Credentials come from the standard boto3 chain."""
     name = "bedrock"
@@ -117,33 +113,6 @@ class BedrockBackend:
         return parse_bedrock(resp)
 
 
-class AnthropicBackend:
-    """Direct-to-provider fallback, used only when SPECLEDGER_LLM_BACKEND is set
-    to something other than "bedrock". Bedrock/Nova is the default path."""
-    name = "anthropic"
-
-    def __init__(self, model: str | None = None):
-        self.model = model or config.LLM_MODEL or "claude-sonnet-4-5"
-        self._client = None
-
-    def client(self):
-        if self._client is None:
-            import anthropic
-            self._client = anthropic.Anthropic(api_key=config.ANTHROPIC_API_KEY)
-        return self._client
-
-    def call(self, prompt: str, temperature: float, *, system: str | None = None,
-             tool_name: str | None = None, tool_desc: str | None = None,
-             tool_schema: dict | None = None) -> dict | None:
-        resp = self.client().messages.create(
-            model=self.model, max_tokens=700, system=system or SYSTEM, temperature=temperature,
-            tools=[{"name": tool_name or TOOL_NAME, "description": tool_desc or TOOL_DESC,
-                    "input_schema": tool_schema or TOOL_SCHEMA}],
-            tool_choice={"type": "tool", "name": tool_name or TOOL_NAME},
-            messages=[{"role": "user", "content": prompt}])
-        return parse_anthropic(resp)
-
-
 def parse_bedrock(resp: dict) -> dict | None:
     """Pull the tool payload out of a Converse response. Pure, so it is testable
     against a recorded response without any network or credentials."""
@@ -157,16 +126,8 @@ def parse_bedrock(resp: dict) -> dict | None:
     return None
 
 
-def parse_anthropic(resp) -> dict | None:
-    for b in getattr(resp, "content", []) or []:
-        if getattr(b, "type", "") == "tool_use":
-            return b.input
-    return None
-
-
-def make_backend(kind: str | None = None):
-    kind = (kind or config.LLM_BACKEND).lower()
-    return BedrockBackend() if kind == "bedrock" else AnthropicBackend()
+def make_backend() -> BedrockBackend:
+    return BedrockBackend()
 
 
 def available() -> bool:
@@ -268,24 +229,19 @@ def panel(include_llm: bool | None = None):
 
 
 def selfcheck() -> int:
-    """Verify the LLM backend end to end. Never prints credential values."""
+    """Verify the Bedrock backend end to end. Never prints credential values."""
     import os
-    print(f"backend        : {config.LLM_BACKEND}")
-    if config.LLM_BACKEND == "bedrock":
-        kid = os.environ.get("AWS_ACCESS_KEY_ID", "")
-        print(f"region         : {config.AWS_REGION}")
-        print(f"model          : {config.BEDROCK_MODEL}")
-        print(f"access key id  : {(kid[:4] + '...' + kid[-4:]) if len(kid) > 8 else '(not set)'}")
-        print(f"secret key     : {'set' if os.environ.get('AWS_SECRET_ACCESS_KEY') else '(not set)'}")
-        print(f"session token  : {'set' if os.environ.get('AWS_SESSION_TOKEN') else 'not set'}")
-    else:
-        print(f"model          : {config.LLM_MODEL}")
-        print(f"api key        : {'set' if config.ANTHROPIC_API_KEY else '(not set)'}")
+    kid = os.environ.get("AWS_ACCESS_KEY_ID", "")
+    print(f"region         : {config.AWS_REGION}")
+    print(f"model          : {config.BEDROCK_MODEL}")
+    print(f"access key id  : {(kid[:4] + '...' + kid[-4:]) if len(kid) > 8 else '(not set)'}")
+    print(f"secret key     : {'set' if os.environ.get('AWS_SECRET_ACCESS_KEY') else '(not set)'}")
+    print(f"session token  : {'set' if os.environ.get('AWS_SESSION_TOKEN') else 'not set'}")
     print(f"samples/extract: {config.LLM_SAMPLES}")
 
     if not available():
         print("\nstatus         : NOT CONFIGURED")
-        print("  add credentials to .env, then re-run `make llm-check`.")
+        print("  add AWS credentials to .env, then re-run `make llm-check`.")
         return 1
 
     be = make_backend()

@@ -24,18 +24,10 @@ for _p in (DATA, FIXTURES, GOLD, CACHE, EVAL_OUT):
 PIPELINE_VERSION = "0.3.0"
 
 # ---- LLM backend -----------------------------------------------------------
-# Bedrock is the default backend, talking to Amazon Nova Lite -- the same model
-# AGENTIQ uses, and the one the AWS credentials in .env are provisioned for.
-# A direct-to-provider API is kept as a fallback path for local development.
-# Credentials are ALWAYS read from the environment at call time and are never
-# logged, serialised into a record, or written to the audit trail.
-LLM_BACKEND = os.environ.get("SPECLEDGER_LLM_BACKEND", "bedrock").strip().lower()
-
-# Fallback path: a directly-configured provider API key, used only when
-# LLM_BACKEND is not "bedrock". Not used by default.
-ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
-LLM_MODEL = os.environ.get("SPECLEDGER_MODEL", "")
-
+# AWS Bedrock, talking to Amazon Nova Lite -- the same model AGENTIQ uses, and
+# the only LLM provider this codebase calls. Credentials are ALWAYS read from
+# the environment at call time and are never logged, serialised into a
+# record, or written to the audit trail.
 AWS_REGION = (os.environ.get("AWS_REGION")
               or os.environ.get("AWS_DEFAULT_REGION") or "us-east-1")
 # Nova Lite requires a region-prefixed inference profile for on-demand
@@ -53,9 +45,7 @@ LLM_SAMPLES = int(os.environ.get("SPECLEDGER_LLM_SAMPLES", "3"))
 
 
 def llm_available() -> bool:
-    if LLM_BACKEND == "bedrock":
-        return _AWS_KEYS_PRESENT
-    return bool(ANTHROPIC_API_KEY)
+    return _AWS_KEYS_PRESENT
 
 
 LLM_AVAILABLE = llm_available()

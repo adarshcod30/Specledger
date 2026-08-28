@@ -10,7 +10,7 @@ rather than picked by eye. Safety-critical attributes get their own, stricter fl
 
 Features are deliberately model-independent -- they describe the EVIDENCE, not the
 generator. That is why the same calibration holds whether candidates came from
-regexes or from Claude.
+regexes or from the LLM extractor.
 """
 from __future__ import annotations
 
