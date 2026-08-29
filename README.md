@@ -15,17 +15,22 @@ human — instead of guessing and hoping.
 <img alt="pip install" src="https://img.shields.io/badge/pip%20install--e-.-2563eb?style=flat-square">
 </p>
 
+**Keywords:** `ai` `llm` `evidence-verification` `product-intelligence` `data-enrichment` `human-in-the-loop` `fastapi` `aws-bedrock` `python-library` `open-source`
+
 ---
 
 ## Table of contents
 
 - [The problem, in one real example](#the-problem-in-one-real-example)
+- [Key features](#key-features)
 - [Why this repo has two projects in it](#why-this-repo-has-two-projects-in-it)
 - [Using SpecLedger as a library](#using-specledger-as-a-library)
 - [Part 1 — SpecLedger: verifiable product intelligence](#part-1--specledger-verifiable-product-intelligence)
-  - [Architecture](#architecture)
+  - [System architecture](#system-architecture)
   - [What each piece does, and why it exists](#what-each-piece-does-and-why-it-exists)
+  - [Application flow — the Review Cockpit request cycle](#application-flow--the-review-cockpit-request-cycle)
   - [How the LLM fits in — and why the architecture doesn't depend on it](#how-the-llm-fits-in--and-why-the-architecture-doesnt-depend-on-it)
+  - [Data & ML pipeline](#data--ml-pipeline)
   - [Results, measured](#results-measured)
   - [The Review Cockpit](#the-review-cockpit)
 - [Part 2 — A second product domain: Major Appliances](#part-2--a-second-product-domain-major-appliances)
@@ -35,10 +40,13 @@ human — instead of guessing and hoping.
 - [API reference](#api-reference)
 - [Setup and running it](#setup-and-running-it)
 - [Testing](#testing)
-- [Deployment](#deployment)
+- [Deployment & infrastructure](#deployment--infrastructure)
 - [Honest limitations](#honest-limitations)
+- [Roadmap](#roadmap)
+- [Contributing](#contributing)
 - [Repository layout](#repository-layout)
 - [License](#license)
+- [Contact](#contact)
 
 ---
 
@@ -62,6 +70,19 @@ this — cryptic descriptions, scattered manufacturer PDFs, specs that are
 safety-critical if wrong — and the review labor to catch every mistake by hand
 doesn't scale. **SpecLedger is the layer that decides which AI-generated
 values are safe to publish unreviewed, and proves it with a citation.**
+
+## Key features
+
+| Feature | Description |
+|---|---|
+| **Evidence-gated extraction** | Every candidate value must carry a verbatim quote from the source document; `verify.py` re-checks it against the actual bytes before anything downstream trusts it — a fabricated citation is discarded regardless of how confident the model sounded. |
+| **Calibrated confidence, not a model's self-reported score** | A logistic-regression calibrator over 11 evidence features (match quality, source agreement, self-consistency, …) picks an auto-publish threshold that hits a measured precision floor on held-out data, instead of trusting an LLM's own stated confidence (badly calibrated by design). |
+| **Selective abstention** | When evidence doesn't clear the bar, the system says so and routes to a human — it never silently guesses to fill a field. |
+| **Full audit trail** | Every decision, every reviewer action, timestamped in SQLite — a value can always be traced back to who/what decided it and why. |
+| **Deterministic-first extraction panel** | Series-table column resolution, two-ended ranges, and inline label/value parsing run before the LLM ever gets involved — the LLM adds recall, it isn't required for the system to work at all. |
+| **Pluggable everything** | Bring your own product schema (`schema.register()`), your own LLM backend (`llm.LLMBackend` Protocol), your own labeled data (`confidence.build_training_set()`) — see [Using SpecLedger as a library](#using-specledger-as-a-library). |
+| **Proven on two independent domains** | The same evidence-gate and calibration core runs unmodified against electronic components (this repo's own demo) and Major Appliances (`appliance_catalog/`, with live web sourcing) — not a single-purpose script. |
+| **Review Cockpit UI** | A zero-build, single-file web app: click any published value to see the exact highlighted sentence that justifies it, plus a risk-ranked review queue for what didn't auto-publish. |
 
 ## Why this repo has two projects in it
 
@@ -160,63 +181,77 @@ A few things worth knowing before you build on this:
 
 ## Part 1 — SpecLedger: verifiable product intelligence
 
-### Architecture
+### System architecture
 
+A sparse SKU (a part number, a brand, and one marketing line) goes through a
+nine-stage pipeline before anything is published. The two stages that carry
+the whole trust claim are **VERIFY** (a value survives only if its quote is
+found, byte-for-byte, in the actual source document) and **CALIBRATE** (the
+publish/review decision comes from a fitted confidence threshold, not a
+model's own stated certainty). Everything else — segmentation, normalization,
+arbitration, physics rules — exists to feed those two stages better evidence.
+
+```mermaid
+flowchart TD
+    SKU["Sparse SKU<br/>mpn + brand + one-line description"] --> INGEST
+    INGEST["1 · INGEST<br/>PDF/HTML → text + char offsets + page map"] --> SEGMENT
+    SEGMENT["2 · SEGMENT<br/>Classify sections: ratings vs. test<br/>conditions vs. graphs"] --> EXTRACT
+
+    subgraph EXTRACT["3 · EXTRACT — strategy panel, each must emit a verbatim quote"]
+        direction LR
+        TC[table_column]
+        RG[range]
+        IS[inline_spec]
+        LLM["llm<br/>Bedrock / Nova Lite"]
+    end
+
+    EXTRACT --> VERIFY
+    VERIFY["4 · VERIFY<br/>Re-check every quote against the real<br/>document bytes — not found = dropped"] --> NORMALIZE
+    NORMALIZE["5 · NORMALIZE<br/>Unit conversion (Pint)"] --> ARBITRATE
+    ARBITRATE["6 · ARBITRATE<br/>Cluster across sources; weight by<br/>evidence + authority + brand match"] --> RULES
+    RULES["7 · RULES<br/>Cross-attribute physics checks"] --> CALIBRATE
+    CALIBRATE["8 · CALIBRATE<br/>Logistic regression → P(correct) →<br/>AUTO_PUBLISH / REVIEW / REJECT"] --> PUBLISH
+    PUBLISH["9 · PUBLISH<br/>Commerce payload + JSON-LD +<br/>audit trail in SQLite"]
+
+    style VERIFY fill:#dc2626,color:#fff,stroke:#991b1b
+    style CALIBRATE fill:#2563eb,color:#fff,stroke:#1d4ed8
 ```
-sparse SKU (mpn + brand + one marketing line)
-  │
-  ├─ 1  INGEST         PDF → text with exact character offsets + page map
-  │                    (PyMuPDF). Same char-offset model works for any plain
-  │                    text source — HTML included, which is what
-  │                    appliance_catalog/ reuses it for.
-  │
-  ├─ 2  SEGMENT        Datasheets have canonical sections, and each has
-  │                    authority over different claims. Absolute Maximum
-  │                    Ratings states ratings; Electrical Characteristics
-  │                    states TEST CONDITIONS that look identical but aren't;
-  │                    Typical Characteristics is graphs and authorizes
-  │                    nothing at all.
-  │
-  ├─ 3  EXTRACT        A panel of strategies, each required to emit a
-  │     │              verbatim quote:
-  │     ├─ table_column   resolves WHICH COLUMN of a series table belongs
-  │     │                 to this exact part — defeats the trap above
-  │     ├─ range           two-ended ranges; unit must come from the
-  │     │                 document, never assumed from the schema
-  │     ├─ inline_spec     label/value lines, dimension-guarded
-  │     └─ llm              Amazon Nova Lite via AWS Bedrock, same contract
-  │                         (self-consistency sampled, k=3 by default)
-  │
-  ├─ 4  VERIFY         Every quote is re-checked against the actual document
-  │                    bytes. Not found → the value is FABRICATED and is
-  │                    dropped, full stop, regardless of how confident the
-  │                    model sounded. Guards: sibling-part contamination,
-  │                    graph-axis rejection, section authority.
-  │
-  ├─ 5  NORMALIZE      Pint. "100mA" and "0.1A" become one comparable number.
-  │
-  ├─ 6  ARBITRATE      Cluster candidate values across sources; weight by
-  │                    evidence quality, source authority, and brand match —
-  │                    never by raw vote count. Cross-manufacturer
-  │                    disagreement is escalated to a human, never silently
-  │                    resolved in either direction.
-  │
-  ├─ 7  RULES          Physics as a free validator: surge current must
-  │                    exceed continuous current, Vin_max must exceed
-  │                    Vout_max, Tmin must be below Tmax.
-  │
-  ├─ 8  CALIBRATE      Logistic regression over 11 evidence features →
-  │                    P(correct). Threshold chosen to hit a target
-  │                    precision floor on OUT-OF-FOLD predictions (not
-  │                    in-sample, which would overstate confidence) →
-  │                    AUTO_PUBLISH / REVIEW / REJECT. Safety-critical
-  │                    attributes get a stricter floor by a monotonicity
-  │                    constraint, not by hoping the data supports one.
-  │
-  └─ 9  PUBLISH        Commerce payload + schema.org JSON-LD + a full audit
-                       trail in SQLite (every decision, every reviewer
-                       action, timestamped).
-```
+
+The stage-by-stage detail behind that diagram:
+
+- **1 · INGEST** — PDF → text with exact character offsets + page map
+  (PyMuPDF). Same char-offset model works for any plain text source — HTML
+  included, which is what `appliance_catalog/` reuses it for.
+- **2 · SEGMENT** — Datasheets have canonical sections, and each has
+  authority over different claims. Absolute Maximum Ratings states ratings;
+  Electrical Characteristics states TEST CONDITIONS that look identical but
+  aren't; Typical Characteristics is graphs and authorizes nothing at all.
+- **3 · EXTRACT** — A panel of strategies, each required to emit a verbatim
+  quote: `table_column` resolves WHICH COLUMN of a series table belongs to
+  this exact part (defeats the trap above); `range` handles two-ended
+  ranges with the unit always coming from the document, never assumed from
+  the schema; `inline_spec` parses label/value lines, dimension-guarded;
+  `llm` is Amazon Nova Lite via AWS Bedrock under the identical contract
+  (self-consistency sampled, k=3 by default).
+- **4 · VERIFY** — Every quote is re-checked against the actual document
+  bytes. Not found → the value is FABRICATED and is dropped, full stop,
+  regardless of how confident the model sounded. Guards: sibling-part
+  contamination, graph-axis rejection, section authority.
+- **5 · NORMALIZE** — Pint. "100mA" and "0.1A" become one comparable number.
+- **6 · ARBITRATE** — Cluster candidate values across sources; weight by
+  evidence quality, source authority, and brand match — never by raw vote
+  count. Cross-manufacturer disagreement is escalated to a human, never
+  silently resolved in either direction.
+- **7 · RULES** — Physics as a free validator: surge current must exceed
+  continuous current, Vin_max must exceed Vout_max, Tmin must be below Tmax.
+- **8 · CALIBRATE** — Logistic regression over 11 evidence features →
+  P(correct). Threshold chosen to hit a target precision floor on
+  OUT-OF-FOLD predictions (not in-sample, which would overstate confidence)
+  → AUTO_PUBLISH / REVIEW / REJECT. Safety-critical attributes get a
+  stricter floor by a monotonicity constraint, not by hoping the data
+  supports one.
+- **9 · PUBLISH** — Commerce payload + schema.org JSON-LD + a full audit
+  trail in SQLite (every decision, every reviewer action, timestamped).
 
 ### What each piece does, and why it exists
 
@@ -234,10 +269,41 @@ sparse SKU (mpn + brand + one marketing line)
 | `specledger/confidence.py` | Logistic regression calibrator, conformal thresholding, out-of-fold scoring | The number that actually decides AUTO_PUBLISH vs. REVIEW — the entire economic case for this system lives here |
 | `specledger/pipeline.py` | Orchestrates ingest → extract → verify → normalize → arbitrate → rules → calibrate for one SKU | The one place that knows the full order of operations |
 | `specledger/publish.py` | Commerce payload + schema.org JSON-LD + "AI-search readiness" scoring | Only `AUTO_PUBLISH` attributes are ever emitted here — by construction, not by convention |
-| `specledger/store.py` | SQLite persistence + append-only audit trail | Chosen over Postgres deliberately: a judge (or you) must be able to clone and run this with zero infrastructure |
+| `specledger/store.py` | SQLite persistence + append-only audit trail | Chosen over Postgres deliberately: anyone must be able to clone and run this with zero infrastructure |
 | `api/main.py` | FastAPI service: 10 endpoints, background catalog warm-up | Enrichment with a live LLM in the panel can take minutes — this runs in a background thread at boot so the first request is never a silent multi-minute hang |
 | `web/index.html` | The Review Cockpit — single static file, zero build step, zero JS framework | A reviewer needs to go from a published number to the sentence that justifies it in one click, or the whole "traceable output" claim is just a slogan |
 
+### Application flow — the Review Cockpit request cycle
+
+What actually happens between opening the app and accepting or rejecting a
+value, traced through the real endpoints in [API reference](#api-reference):
+
+```mermaid
+sequenceDiagram
+    participant U as Reviewer
+    participant W as Review Cockpit
+    participant A as FastAPI
+    participant P as Pipeline
+    participant D as SQLite audit trail
+
+    U->>W: opens the app
+    W->>A: GET /api/ready (poll until warm)
+    A-->>W: {ready, llm_extractor}
+    W->>A: GET /api/records
+    A-->>W: every SKU + published/total ratio
+    U->>W: clicks a SKU
+    W->>A: GET /api/records/{sku}
+    A-->>W: full attribute breakdown + evidence spans
+    U->>W: clicks an attribute
+    W->>A: GET /api/evidence/{sku}/{attribute}.png
+    A-->>W: source page, highlighted span rendered
+    U->>W: clicks Accept or Reject
+    W->>A: POST /api/review {sku, attribute, action}
+    A->>P: re-decide with reviewer override
+    A->>D: append audit-trail entry (who, what, when)
+    A-->>W: updated record
+    W-->>U: attribute list + review queue refresh
+```
 ### How the LLM fits in — and why the architecture doesn't depend on it
 
 `specledger/llm.py` talks to **Amazon Nova Lite over AWS Bedrock's Converse
@@ -266,6 +332,62 @@ proves this in practice — it reuses the exact same `specledger/llm.py` backend
 completely different domain, with zero duplicated credential or retry logic
 (`BedrockBackend.call()` accepts an optional system prompt and tool schema
 override specifically so a second domain could share it).
+
+### Data & ML pipeline
+
+**1. Data sources & collection.** `specledger/corpus.py` pins 7 real
+manufacturer-datasheet URLs (Vishay, Diodes Incorporated, Texas Instruments)
+with expected SHA-256 hashes and fetches them fresh — datasheets are
+copyrighted, so none are vendored into git. A hash mismatch on re-fetch means
+a vendor silently revised the PDF, which the corpus lock file surfaces
+automatically. `appliance_catalog/` sources differently: live HTTP against
+manufacturer domains only, resolved at run time via `search.py` when no
+brand is named in the input text.
+
+**2. Cleaning.** PDF → text happens in `ingest.py` via PyMuPDF, preserving
+exact character offsets and a per-page span map (needed later so a quote can
+be verified against real bytes, not a re-flattened approximation).
+`sections.py` then classifies every span of text into a canonical section
+(Absolute Maximum Ratings / Electrical Characteristics / Typical
+Characteristics / mechanical / features) — without this step, a numeric test
+condition ("T_J = 100°C") reads identically to a rated maximum, a real bug
+this project caught and fixed mid-build.
+
+**3. Feature engineering.** The calibrator never sees which extractor or
+model produced a value — only 11 features describing the *evidence itself*
+(`specledger/confidence.py`), which is what lets a pure-regex panel and an
+LLM-backed panel share one calibration:
+
+| Feature | What it captures |
+|---|---|
+| `extractor_precision` | How trustworthy the winning strategy is |
+| `match_quality` | How cleanly the quote matched the source bytes (exact / normalized / relocated) |
+| `agreeing_sources` | Independent documents supporting the value |
+| `is_conflicting` | Cross-document disagreement |
+| `n_competing` | How many rival values existed |
+| `rule_violations` | Cross-attribute physics violations |
+| `authority` | Weight of the winning source tier (manufacturer vs. distributor vs. marketplace) |
+| `column_resolved` | Value came from a resolved series-table column |
+| `n_quarantined` | Candidates killed by the sibling-contamination guard |
+| `has_focus` | Evidence pins an exact cell, not just a whole row |
+| `self_consistency` | Agreement across independent LLM samples (always 1.0 for deterministic extractors) |
+
+**4. Model training.** `ConfidenceModel.fit()` runs a logistic regression
+(`scikit-learn`) over those 11 features, with stratified k-fold
+cross-validation (`k = min(5, max(2, minority-class count))`, clamped so a
+small or imbalanced gold set never breaks the split). Publish thresholds are
+picked from **out-of-fold** predictions only
+— never in-sample, which would overstate achievable precision — by
+searching for the lowest threshold whose OOF precision still clears the
+target floor. Safety-critical attributes get their own, stricter floor,
+enforced by a monotonicity constraint (never easier to publish than a
+general attribute) rather than left to whatever the small sample happens to
+support.
+
+**5. Evaluation.** Precision and coverage at the chosen threshold, Expected
+Calibration Error (mean gap between stated confidence and observed
+accuracy), and the full risk–coverage frontier — see
+[Results, measured](#results-measured) below for the actual numbers.
 
 ### Results, measured
 
@@ -537,20 +659,38 @@ make test
 .venv/bin/python -m pytest tests/ appliance_catalog/tests/ -q
 ```
 
-## Deployment
+## Deployment & infrastructure
 
-**Not currently deployed to a public URL — runs locally via `make run`.**
-There's no Dockerfile, `render.yaml`, `fly.toml`, or similar in this repo
-yet; the FastAPI service is a standard ASGI app and would deploy cleanly to
-Render, Fly.io, Railway, or an EC2/Lightsail instance with `uvicorn` behind a
-reverse proxy — none of that has been done. If a live demo is needed, the
-fastest path is `uvicorn api.main:app --host 0.0.0.0 --port $PORT` on any of
-the above.
+- **Hosting:** **Not currently deployed to a public URL — runs locally via
+  `make run`.** There's no Dockerfile, `render.yaml`, `fly.toml`, or similar
+  in this repo yet; the FastAPI service is a standard ASGI app and would
+  deploy cleanly to Render, Fly.io, Railway, or an EC2/Lightsail instance
+  with `uvicorn` behind a reverse proxy — none of that has been done. If a
+  live demo is needed, the fastest path is `uvicorn api.main:app --host
+  0.0.0.0 --port $PORT` on any of the above.
+- **CI/CD:** [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs the
+  full test suite (`pytest tests/ appliance_catalog/tests/`) on every push
+  and pull request to `main`, after fetching the pinned vendor datasheets so
+  the run starts from the same state a fresh clone would. No deploy step
+  yet — there's nowhere to deploy to.
+- **Containerization:** None yet. `requirements.txt` + `pyproject.toml`
+  cover the Python side; a `Dockerfile` for `api/main.py` is a
+  straightforward addition (see [Roadmap](#roadmap)).
+- **Environments:** Local only — `.env` controls whether the LLM extractor
+  is live (AWS credentials present) or the deterministic-only panel runs
+  (no credentials). There's no separate staging/prod split.
+- **Monitoring & logging:** `/api/health` exposes catalog stats, calibration
+  metrics, and LLM backend status on demand; every reviewer decision is
+  logged to the SQLite audit trail (`store.py`). No external monitoring or
+  alerting is wired up.
+- **Scaling:** Not designed for concurrent load yet — SQLite and an
+  in-process background warm-up thread are deliberate zero-infrastructure
+  choices for a project meant to be cloned and run locally, not a
+  production deployment target as-is.
 
-**GitHub repository "About" panel** — the sidebar (description, website link,
-topics) is set from the repo settings UI, not from this file. Paste this in
-at [github.com/adarshcod30/specledger](https://github.com/adarshcod30/specledger) →
-the gear icon next to "About":
+**GitHub repository "About" panel** — the sidebar (description, website
+link, topics) is set from the repo settings UI, not from this file; it's
+already configured to match:
 
 > **Description:** Chain of custody for AI-generated product data — evidence-gated extraction, calibrated confidence, and selective abstention for industrial product intelligence.
 > **Topics:** `ai`, `llm`, `product-intelligence`, `data-enrichment`, `fastapi`, `aws-bedrock`, `evidence-verification`, `human-in-the-loop`, `open-source`, `python-library`
@@ -586,7 +726,51 @@ the gear icon next to "About":
   content-guidelines document was provided for that build — see
   [appliance_catalog/README.md](appliance_catalog/README.md) for the full
   accounting of what that does and doesn't let the pipeline verify.
-- **No public deployment yet** — see [Deployment](#deployment).
+- **No public deployment yet** — see [Deployment & infrastructure](#deployment--infrastructure).
+
+## Roadmap
+
+Derived directly from the limitations above — real gaps, not aspirational
+filler:
+
+- [ ] Expand the gold set past 98 labels / 12 SKUs to tighten the achievable
+      precision-floor ceiling
+- [ ] Add a monotonicity constraint on `is_conflicting`'s calibrator weight
+      at a larger sample size
+- [ ] Add more SpecLedger product classes beyond rectifier diodes and linear
+      regulators via `schema.register()`
+- [ ] Publish `specledger` to PyPI (currently `pip install -e .` from a
+      clone only)
+- [ ] Grow test coverage on the library-API seam (`documents=`/`known_parts=`,
+      pluggable backend) toward the same depth as the core gold-set eval
+- [ ] Verify `appliance_catalog/`'s manufacturer-of-record data for brands
+      beyond Frigidaire and Whirlpool
+- [ ] Add a `Dockerfile` and a real deployment target for the Review Cockpit
+- [ ] Ship a non-Bedrock reference `LLMBackend` implementation as a worked
+      example of the pluggable-backend seam
+
+See [open issues](https://github.com/adarshcod30/specledger/issues) for
+anything not tracked here yet.
+
+## Contributing
+
+Contributions are welcome — this is meant to be usable and extendable by
+anyone, not a closed demo.
+
+The extension points to start from: a new product class via
+`schema.register()`, a new LLM provider via the `specledger.llm.LLMBackend`
+Protocol, or a calibrator trained on your own labeled data via
+`confidence.build_training_set()` (all covered under
+[Using SpecLedger as a library](#using-specledger-as-a-library)).
+
+1. Fork the project
+2. Create your feature branch (`git checkout -b feature/your-feature`)
+3. Run `make test` before committing — the suite is 51 tests, hermetic, and
+   takes about a second and a half
+4. Commit your changes and open a PR against `main`
+
+For anything beyond a small fix, opening an issue first to discuss the
+approach is appreciated but not required.
 
 ## Repository layout
 
@@ -623,3 +807,10 @@ specledger/
 ## License
 
 [MIT](LICENSE) — see the LICENSE file.
+
+## Contact
+
+**Adarsh Dwivedi** — [GitHub @adarshcod30](https://github.com/adarshcod30)
+
+Project link: [github.com/adarshcod30/specledger](https://github.com/adarshcod30/specledger)
+· Bugs and feature requests: [open an issue](https://github.com/adarshcod30/specledger/issues)
