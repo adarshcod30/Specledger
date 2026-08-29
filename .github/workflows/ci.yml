@@ -18,5 +18,8 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      - name: Fetch vendor datasheets
+        run: python -m specledger.corpus
+
       - name: Run tests
         run: pytest tests/ appliance_catalog/tests/ -q -p no:warnings
