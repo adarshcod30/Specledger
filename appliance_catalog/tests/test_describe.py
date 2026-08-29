@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
-from unihack.describe import ProductFacts, ResolvedAttr, invoice_desc, mobile_desc, short_desc, retail_desc, long_desc1
+from appliance_catalog.describe import ProductFacts, ResolvedAttr, invoice_desc, mobile_desc, short_desc, retail_desc, long_desc1
 
 
 def mk(label, value="", uom=""):

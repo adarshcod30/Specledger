@@ -7,15 +7,13 @@ to. Where a value can't be verified, the system says so and routes it to a
 human — instead of guessing and hoping.
 
 <p>
-<a href="https://github.com/adarshcod30/Unisol/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/adarshcod30/Unisol/actions/workflows/ci.yml/badge.svg"></a>
+<a href="https://github.com/adarshcod30/specledger/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/adarshcod30/specledger/actions/workflows/ci.yml/badge.svg"></a>
 <img alt="tests" src="https://img.shields.io/badge/tests-51%20passing-158a4a?style=flat-square">
 <img alt="python" src="https://img.shields.io/badge/python-3.13-2563eb?style=flat-square">
 <img alt="llm" src="https://img.shields.io/badge/LLM-Amazon%20Nova%20Lite%20(Bedrock)-0891b2?style=flat-square">
 <img alt="license" src="https://img.shields.io/badge/license-MIT-8b93a1?style=flat-square">
 <img alt="pip install" src="https://img.shields.io/badge/pip%20install--e-.-2563eb?style=flat-square">
 </p>
-
-Team **Unisol**.
 
 ---
 
@@ -30,7 +28,7 @@ Team **Unisol**.
   - [How the LLM fits in — and why the architecture doesn't depend on it](#how-the-llm-fits-in--and-why-the-architecture-doesnt-depend-on-it)
   - [Results, measured](#results-measured)
   - [The Review Cockpit](#the-review-cockpit)
-- [Part 2 — UniHack: product intelligence for Major Appliances](#part-2--unihack-product-intelligence-for-major-appliances)
+- [Part 2 — A second product domain: Major Appliances](#part-2--a-second-product-domain-major-appliances)
 - [Tech stack](#tech-stack)
 - [Environment variables and keys](#environment-variables-and-keys)
 - [Data map — every file and what's in it](#data-map--every-file-and-whats-in-it)
@@ -67,17 +65,17 @@ values are safe to publish unreviewed, and proves it with a citation.**
 
 ## Why this repo has two projects in it
 
-| | **SpecLedger** (repo root) | **UniHack module** (`unihack/`) |
+| | **SpecLedger** (repo root) | **Appliance catalog module** (`appliance_catalog/`) |
 |---|---|---|
-| What it is | The core architecture: evidence-gated extraction, source arbitration, calibrated confidence, selective abstention | A real submission to Unilog's UniHack challenge, built by retargeting SpecLedger's proven backend at a different domain |
+| What it is | The core architecture: evidence-gated extraction, source arbitration, calibrated confidence, selective abstention | A real second domain, built by retargeting SpecLedger's proven backend at a completely different kind of product |
 | Domain | Electronic components (rectifier diodes, linear regulators) | Major home appliances (dishwashers, washers, dryers, ranges…) |
 | Sourcing | Pre-fetched manufacturer PDF datasheets (Vishay, Diodes Inc, Texas Instruments) | **Live** web sourcing — real-time search + fetch against manufacturer sites, at run time |
-| Output | A Review Cockpit web app + audit trail in SQLite | A 252-column CSV matching Unilog's exact Delivery Format schema |
-| Ground truth | A 98-label gold set, hand-transcribed from the same PDFs | 2 fully-populated real rows from Unilog's own Expected Output file |
+| Output | A Review Cockpit web app + audit trail in SQLite | A 252-column CSV matching a real distributor's exact Delivery Format schema |
+| Ground truth | A 98-label gold set, hand-transcribed from the same PDFs | 2 fully-populated real rows from a real Expected Output file |
 
-`unihack/extract.py` imports directly from `specledger/llm.py` — the two
-projects share one Bedrock/Nova Lite credential path and one evidence-gate
-contract. See [How things connect](#how-the-llm-fits-in--and-why-the-architecture-doesnt-depend-on-it).
+`appliance_catalog/extract.py` imports directly from `specledger/llm.py` —
+the two projects share one Bedrock/Nova Lite credential path and one
+evidence-gate contract. See [How things connect](#how-the-llm-fits-in--and-why-the-architecture-doesnt-depend-on-it).
 
 ---
 
@@ -169,8 +167,8 @@ sparse SKU (mpn + brand + one marketing line)
   │
   ├─ 1  INGEST         PDF → text with exact character offsets + page map
   │                    (PyMuPDF). Same char-offset model works for any plain
-  │                    text source — HTML included, which is what unihack/
-  │                    reuses it for.
+  │                    text source — HTML included, which is what
+  │                    appliance_catalog/ reuses it for.
   │
   ├─ 2  SEGMENT        Datasheets have canonical sections, and each has
   │                    authority over different claims. Absolute Maximum
@@ -263,8 +261,8 @@ matter more than the model choice itself:
 Because the confidence model's 11 features describe the *evidence*
 (match quality, source authority, agreeing-source count, self-consistency…)
 rather than which model produced it, swapping the LLM for a pure regex panel
-doesn't invalidate anything the calibrator learned. `unihack/` proves this in
-practice — it reuses the exact same `specledger/llm.py` backend for a
+doesn't invalidate anything the calibrator learned. `appliance_catalog/`
+proves this in practice — it reuses the exact same `specledger/llm.py` backend for a
 completely different domain, with zero duplicated credential or retry logic
 (`BedrockBackend.call()` accepts an optional system prompt and tool schema
 override specifically so a second domain could share it).
@@ -334,27 +332,27 @@ gracefully re-stacks instead of clipping.
 
 ---
 
-## Part 2 — UniHack: product intelligence for Major Appliances
+## Part 2 — A second product domain: Major Appliances
 
-Unilog's actual UniHack brief: given a bare `Mfg_Part_Num, Part_Desc,
-E1_Brand, Unilog_Brand, DIB_Brand, Part_Manuf` row, produce a fully-populated
-**252-column** Delivery Format record — the exact schema Unilog uses
-internally, header names unmodified.
+A real-world stress test of the architecture: given a bare `Mfg_Part_Num,
+Part_Desc, E1_Brand, Unilog_Brand, DIB_Brand, Part_Manuf` row, produce a
+fully-populated **252-column** Delivery Format record — a real distributor's
+exact internal schema, header names unmodified.
 
 Full writeup, architecture diagram, and every measured number:
-**[unihack/README.md](unihack/README.md)**.
+**[appliance_catalog/README.md](appliance_catalog/README.md)**.
 
 The short version: construction formulas for every description field
 (`INVOICE_DESC`, `MOBILE_DESC`, `SHORT_DESC`, `LONG_DESC1`, `RETAIL_DESC`)
 were reverse-engineered by diffing two real ground-truth rows field by
 field — not guessed — and verified to reproduce them **10/10 exact
-byte-for-byte** (`unihack/tests/test_describe.py`). The pipeline is
+byte-for-byte** (`appliance_catalog/tests/test_describe.py`). The pipeline is
 genuinely dynamic: real live search resolves a brand when none is named in
 the input text, real HTTP fetches hit the manufacturer's own domain only
-(never a marketplace or distributor, per the brief's sourcing rule), and a
-real Bedrock/Nova Lite pass extracts attributes under the identical
+(never a marketplace or distributor, per this project's own sourcing rule),
+and a real Bedrock/Nova Lite pass extracts attributes under the identical
 evidence-gate contract as SpecLedger. Run across all 65 Major Appliance rows
-in the real 1,000-item input in 212.5 seconds: `unihack/out/delivery_format.csv`.
+in the raw input catalog in 212.5 seconds: `appliance_catalog/out/delivery_format.csv`.
 
 A genuine, externally-verified finding from that run: 50 of 65 rows resolved
 a brand correctly and then hit a manufacturer site running bot-management
@@ -373,23 +371,23 @@ specific reason recorded — never left silently blank, never fabricated.
 | API | FastAPI + Uvicorn | Async-friendly, typed, minimal ceremony |
 | PDF parsing | PyMuPDF (`pymupdf`) | Gives character-level bounding boxes — span highlighting in the UI is nearly free |
 | Units | Pint | Don't hand-roll unit conversion; industrial specs use five spellings for one unit |
-| HTTP client | httpx | Used for both PDF fetches and, in `unihack/`, live HTML fetches |
+| HTTP client | httpx | Used for both PDF fetches and, in `appliance_catalog/`, live HTML fetches |
 | LLM | Amazon Nova Lite via **AWS Bedrock** (`boto3`) | The only LLM provider called anywhere in this codebase; cost-efficient, and the same account already used elsewhere on this team |
 | ML | scikit-learn (`LogisticRegression`), numpy, pandas | The whole confidence model is ~200 lines and outperforms trusting a model's self-reported confidence |
-| Storage | SQLite (via `sqlite3`) | Zero-infrastructure — a judge clones the repo and runs it, no server to provision |
+| Storage | SQLite (via `sqlite3`) | Zero-infrastructure — clone the repo and run it, no server to provision |
 | Validation | Pydantic | Request/response models in the API layer |
 | Config | `python-dotenv` | `.env` → `os.environ`, gitignored |
 | Testing | pytest | 51 tests, 1.4s wall clock, hermetic (see [Testing](#testing)) |
-| Frontend | Vanilla HTML/CSS/JS, one file, no framework, no build step | The deliverable has to run with `make run` and nothing else |
-| Live search (`unihack/`) | DuckDuckGo's HTML endpoint, no API key | Resolves a brand's manufacturer domain from a bare model number at run time — not a lookup table |
+| Frontend | Vanilla HTML/CSS/JS, one file, no framework, no build step | The demo app runs with `make run` and nothing else |
+| Live search (`appliance_catalog/`) | DuckDuckGo's HTML endpoint, no API key | Resolves a brand's manufacturer domain from a bare model number at run time — not a lookup table |
 
 ## Environment variables and keys
 
 Copy `.env.example` to `.env`. **Every value is optional** — SpecLedger and
-the `unihack` module both run fully offline on the deterministic extractors
-with zero configuration; credentials only switch on the LLM extractor, which
-joins the panel and raises recall under the identical evidence-verification
-contract as everything else.
+the `appliance_catalog` module both run fully offline on the deterministic
+extractors with zero configuration; credentials only switch on the LLM
+extractor, which joins the panel and raises recall under the identical
+evidence-verification contract as everything else.
 
 | Variable | Default | What it controls |
 |---|---|---|
@@ -434,15 +432,15 @@ eval/out/metrics.json       The full evaluation output the Review Cockpit's
                             risk-coverage curve, feature weights, disclosed
                             errors. Regenerated by `make eval`.
 
-unihack/data/output_header.py   The exact 252-column Delivery Format header,
-                                 parsed once from Unilog's real Expected
-                                 Output file and never hand-edited — the
-                                 single source of truth for column order.
+appliance_catalog/data/output_header.py   The exact 252-column Delivery
+                                 Format header, parsed once from a real
+                                 Expected Output file and never hand-edited —
+                                 the single source of truth for column order.
 
-unihack/out/
+appliance_catalog/out/
 ├── delivery_format.csv     The actual deliverable: 65 rows × 252 columns,
 │                           header names unmodified, from a live run against
-│                           the real 1,000-item input.
+│                           the raw input catalog.
 └── review_queue.csv        Companion file: decision, confidence, and the
                             specific reason for every row that didn't
                             auto-publish.
@@ -468,8 +466,8 @@ unihack/out/
 ## Setup and running it
 
 ```bash
-git clone https://github.com/adarshcod30/Unisol.git
-cd Unisol
+git clone https://github.com/adarshcod30/specledger.git
+cd specledger
 make setup      # venv + pip install -r requirements.txt
 make fetch      # downloads 7 real datasheets (~10 MB) from vendor sites,
                  # SHA-256 pinned in specledger/corpus.py
@@ -492,12 +490,12 @@ against a live column-resolution trap, credentials masked in the output),
 `make clean` (clears generated data, keeps fetched PDFs), `make reset` (also
 re-fetches everything from scratch).
 
-For the UniHack module specifically:
+For the appliance catalog module specifically:
 
 ```bash
-.venv/bin/python -m pytest unihack/tests/ -q   # 6 tests, no network
-.venv/bin/python -m unihack.eval                # 2 known SKUs, live sourcing
-.venv/bin/python -m unihack.run_batch            # all 65 rows, live, ~3.5 min
+.venv/bin/python -m pytest appliance_catalog/tests/ -q   # 6 tests, no network
+.venv/bin/python -m appliance_catalog.eval                # 2 known SKUs, live sourcing
+.venv/bin/python -m appliance_catalog.run_batch            # all 65 rows, live, ~3.5 min
 ```
 
 ## Testing
@@ -519,7 +517,7 @@ tests/                                45 tests — SpecLedger
                                            a document built from a plain
                                            string, no corpus.py involved
 
-unihack/tests/test_describe.py        6 tests — every description formula
+appliance_catalog/tests/test_describe.py  6 tests — every description formula
                                        reproduces real ground truth exactly
 ```
 
@@ -536,7 +534,7 @@ cost must not depend on what happens to be sitting in `.env`.
 ```bash
 make test
 # or directly:
-.venv/bin/python -m pytest tests/ unihack/tests/ -q
+.venv/bin/python -m pytest tests/ appliance_catalog/tests/ -q
 ```
 
 ## Deployment
@@ -545,17 +543,17 @@ make test
 There's no Dockerfile, `render.yaml`, `fly.toml`, or similar in this repo
 yet; the FastAPI service is a standard ASGI app and would deploy cleanly to
 Render, Fly.io, Railway, or an EC2/Lightsail instance with `uvicorn` behind a
-reverse proxy — none of that has been done. If a live demo is needed for
-judging, the fastest path is `uvicorn api.main:app --host 0.0.0.0 --port
-$PORT` on any of the above.
+reverse proxy — none of that has been done. If a live demo is needed, the
+fastest path is `uvicorn api.main:app --host 0.0.0.0 --port $PORT` on any of
+the above.
 
 **GitHub repository "About" panel** — the sidebar (description, website link,
 topics) is set from the repo settings UI, not from this file. Paste this in
-at [github.com/adarshcod30/Unisol](https://github.com/adarshcod30/Unisol) →
+at [github.com/adarshcod30/specledger](https://github.com/adarshcod30/specledger) →
 the gear icon next to "About":
 
 > **Description:** Chain of custody for AI-generated product data — evidence-gated extraction, calibrated confidence, and selective abstention for industrial product intelligence.
-> **Topics:** `ai`, `llm`, `product-intelligence`, `data-enrichment`, `fastapi`, `aws-bedrock`, `evidence-verification`, `human-in-the-loop`
+> **Topics:** `ai`, `llm`, `product-intelligence`, `data-enrichment`, `fastapi`, `aws-bedrock`, `evidence-verification`, `human-in-the-loop`, `open-source`, `python-library`
 
 ## Honest limitations
 
@@ -578,21 +576,22 @@ the gear icon next to "About":
   bring-your-own-document seams are new and covered by exactly three tests
   (`tests/test_library_api.py`), not the same depth of scrutiny as the
   demo's own gold-set evaluation.
-- **SQLite, not Postgres.** Deliberate, for a project a judge or reviewer
-  must be able to clone and run with zero infrastructure.
-- **`unihack/`'s brand styling and manufacturer-of-record data is verified
-  for Frigidaire and Whirlpool only** (from real ground truth); every other
-  brand uses a public-record default, explicitly flagged `unverified` in the
-  output rather than presented as compliant. No manufacturer/brand master
-  list, LOV, UOM standards file, or content-guidelines document was provided
-  for that build — see [unihack/README.md](unihack/README.md) for the full
+- **SQLite, not Postgres.** Deliberate, so anyone can clone and run this with
+  zero infrastructure.
+- **`appliance_catalog/`'s brand styling and manufacturer-of-record data is
+  verified for Frigidaire and Whirlpool only** (from real ground truth);
+  every other brand uses a public-record default, explicitly flagged
+  `unverified` in the output rather than presented as compliant. No
+  manufacturer/brand master list, LOV, UOM standards file, or
+  content-guidelines document was provided for that build — see
+  [appliance_catalog/README.md](appliance_catalog/README.md) for the full
   accounting of what that does and doesn't let the pipeline verify.
 - **No public deployment yet** — see [Deployment](#deployment).
 
 ## Repository layout
 
 ```
-Unisol/
+specledger/
 ├── specledger/              core architecture — see the module table above
 │   ├── corpus.py, ingest.py, sections.py, extract.py, llm.py, verify.py,
 │   │   normalize.py, arbitrate.py, rules.py, confidence.py, pipeline.py,
@@ -603,14 +602,16 @@ Unisol/
 ├── eval/run_eval.py           naive-vs-SpecLedger evaluation harness
 ├── data/                      gold set, cache, corpus lock, SQLite DB
 ├── tests/                     45 tests (incl. test_library_api.py)
-├── unihack/                    the UniHack competition submission
+├── appliance_catalog/           a second product domain, retargeting the
+│                                 same core at Major Appliances — see
+│                                 appliance_catalog/README.md
 │   ├── taxonomy.py, brand.py, search.py, source.py, extract.py,
 │   │   describe.py, uom.py, schema.py, pipeline.py, export.py,
 │   │   run_batch.py, eval.py
 │   ├── data/output_header.py   the 252-column schema
 │   ├── out/                    delivery_format.csv, review_queue.csv
 │   ├── tests/test_describe.py  6 tests
-│   └── README.md                full UniHack writeup
+│   └── README.md                full writeup for this domain
 ├── pyproject.toml              `pip install -e .` — specledger/ only
 ├── .github/workflows/ci.yml    pytest on every push and PR
 ├── requirements.txt

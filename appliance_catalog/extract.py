@@ -21,7 +21,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from specledger.llm import make_backend, available            # noqa: E402
-from unihack.schema import AttrSpec                            # noqa: E402
+from appliance_catalog.schema import AttrSpec                            # noqa: E402
 
 _WS = re.compile(r"\s+")
 

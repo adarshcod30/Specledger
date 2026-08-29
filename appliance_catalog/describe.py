@@ -2,12 +2,13 @@
 ground-truth rows -- not invented, not LLM-freewritten.
 
 Every formula below was derived by diffing the two real Delivery Format rows
-field by field (see unihack/data/output_header.py and the worked dishwasher
-example in the Solution Guide, page 5: "Product Title = Brand + Series + MPN +
-Item Type + key attributes"). Where the two examples disagree on whether a
-clause appears (e.g. row 1 has no wash-cycle count in LONG_DESC1's mounting
-clause order but row 2 omits mounting from MOBILE_DESC), the rule implemented is
-"include the clause only if that attribute is actually populated for this row" --
+field by field (see appliance_catalog/data/output_header.py and the target
+format's own construction spec for the worked dishwasher example: "Product
+Title = Brand + Series + MPN + Item Type + key attributes"). Where the two
+examples disagree on whether a clause appears (e.g. row 1 has no wash-cycle
+count in LONG_DESC1's mounting clause order but row 2 omits mounting from
+MOBILE_DESC), the rule implemented is "include the clause only if that
+attribute is actually populated for this row" --
 which is the one hypothesis consistent with both examples simultaneously.
 
 LONG_DESC1 uses a PER-ATTRIBUTE phrase template because the two ground-truth

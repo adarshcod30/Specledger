@@ -1,12 +1,12 @@
 """Unit-of-measure normalization.
 
-We do not have Unilog's real 500-entry UOM standards file, so this is a small,
-explicitly-scoped table covering only the units actually observed in the two
-known-good ground-truth rows (V, A, in, dBA, kW-hr, hr) plus the handful of
-adjacent units a major-appliance spec sheet commonly states (W, cu ft, lb).
-It is not a general-purpose UOM engine and does not claim to be Unilog's
-approved list -- a unit outside this table is left as-is and flagged for
-review rather than silently guessed at.
+We do not have a real, full UOM standards file for the target catalog, so this
+is a small, explicitly-scoped table covering only the units actually observed
+in the two known-good ground-truth rows (V, A, in, dBA, kW-hr, hr) plus the
+handful of adjacent units a major-appliance spec sheet commonly states (W,
+cu ft, lb). It is not a general-purpose UOM engine and does not claim to be
+an authoritative approved list -- a unit outside this table is left as-is
+and flagged for review rather than silently guessed at.
 
 The one house-style rule we DO have directly from the guide text is applied
 unconditionally: always a space between the number and the unit ("24 in", not

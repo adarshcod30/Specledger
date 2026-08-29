@@ -20,14 +20,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from unihack import brand as brandmod
-from unihack import describe
-from unihack import search as searchmod
-from unihack import source as sourcemod
-from unihack import taxonomy
-from unihack.extract import AttributeExtractor
-from unihack.schema import attrs_for
-from unihack.uom import normalize_unit
+from appliance_catalog import brand as brandmod
+from appliance_catalog import describe
+from appliance_catalog import search as searchmod
+from appliance_catalog import source as sourcemod
+from appliance_catalog import taxonomy
+from appliance_catalog.extract import AttributeExtractor
+from appliance_catalog.schema import attrs_for
+from appliance_catalog.uom import normalize_unit
 
 
 @dataclass

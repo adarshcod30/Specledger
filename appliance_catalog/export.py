@@ -7,8 +7,8 @@ from __future__ import annotations
 import csv
 from pathlib import Path
 
-from unihack.data.output_header import HEADER
-from unihack.pipeline import OutputRow
+from appliance_catalog.data.output_header import HEADER
+from appliance_catalog.pipeline import OutputRow
 
 
 def write_csv(rows: list[OutputRow], path: str | Path) -> None:

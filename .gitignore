@@ -22,7 +22,7 @@ env/
 node_modules/
 .next/
 out/
-!unihack/out/
+!appliance_catalog/out/
 dist/
 build/
 *.tsbuildinfo

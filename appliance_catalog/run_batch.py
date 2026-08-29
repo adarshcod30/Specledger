@@ -1,25 +1,28 @@
-"""Batch runner: 1000-item raw input -> Major Appliances rows -> full 252-column
+"""Batch runner: a raw catalog input -> Major Appliances rows -> full 252-column
 Delivery Format CSV, plus a companion review-queue CSV.
 
-Run: .venv/bin/python -m unihack.run_batch
+Run: .venv/bin/python -m appliance_catalog.run_batch
+Point it at your own input with APPLIANCE_CATALOG_INPUT_CSV=/path/to/input.csv
 """
 from __future__ import annotations
 
 import csv
+import os
 import sys
 import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from unihack.export import write_csv, write_review_log             # noqa: E402
-from unihack.extract import AttributeExtractor                     # noqa: E402
-from unihack.pipeline import InputRow, run_row                     # noqa: E402
-from unihack.taxonomy import classify                               # noqa: E402
+from appliance_catalog.export import write_csv, write_review_log             # noqa: E402
+from appliance_catalog.extract import AttributeExtractor                     # noqa: E402
+from appliance_catalog.pipeline import InputRow, run_row                     # noqa: E402
+from appliance_catalog.taxonomy import classify                               # noqa: E402
 
-INPUT_CSV = "/Users/adarsh/Downloads/Unihack_ Sample Dataset - Input.csv"
-OUT_CSV = "unihack/out/delivery_format.csv"
-REVIEW_CSV = "unihack/out/review_queue.csv"
+INPUT_CSV = os.environ.get("APPLIANCE_CATALOG_INPUT_CSV",
+                            "appliance_catalog/data/sample_input.csv")
+OUT_CSV = "appliance_catalog/out/delivery_format.csv"
+REVIEW_CSV = "appliance_catalog/out/review_queue.csv"
 
 NON_APPLIANCE_MANUF_EXCLUDE = {"Milwaukee Accessory (4031)", "Black & Decker/dewlt (2585)"}
 
@@ -50,7 +53,7 @@ def main():
         try:
             out = run_row(row, extractor=extractor)
         except Exception as e:
-            from unihack.pipeline import OutputRow
+            from appliance_catalog.pipeline import OutputRow
             out = OutputRow()
             out.set("Mfg_Part_Num", row.mfg_part_num)
             out.set("Part_Desc", row.part_desc)

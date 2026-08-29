@@ -1,5 +1,4 @@
-"""Field-level accuracy against the two known-good ground-truth rows -- the
-"Show your evaluation" metric the guide explicitly says judges look for.
+"""Field-level accuracy against the two known-good ground-truth rows.
 
 Two numbers are reported, deliberately kept separate:
 
@@ -7,7 +6,7 @@ Two numbers are reported, deliberately kept separate:
      states them), do the description-builder formulas in describe.py
      reproduce the real strings exactly? This isolates the deterministic
      template logic from live sourcing, and is covered byte-for-byte by
-     unihack/tests/test_describe.py (10/10 fields, both rows).
+     appliance_catalog/tests/test_describe.py (10/10 fields, both rows).
 
   2. End-to-end field accuracy: running the FULL live pipeline (real brand
      resolution, real fetch, real evidence-gated extraction) against these
@@ -16,7 +15,7 @@ Two numbers are reported, deliberately kept separate:
      sites happen to be reachable at run time, which is real-world, not a
      limitation of the scoring method.
 
-Run: .venv/bin/python -m unihack.eval
+Run: .venv/bin/python -m appliance_catalog.eval
 """
 from __future__ import annotations
 
@@ -25,7 +24,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from unihack.pipeline import InputRow, run_row                     # noqa: E402
+from appliance_catalog.pipeline import InputRow, run_row                     # noqa: E402
 
 GROUND_TRUTH = {
     "PDSH4816AF": {
@@ -74,7 +73,7 @@ def main():
     print(f"\n{'='*70}\nfield-level match on structural fields: {matched}/{total} "
           f"({100*matched/total:.0f}%)")
     print("(construction-formula fidelity given correct attributes: 10/10, "
-          "see unihack/tests/test_describe.py)")
+          "see appliance_catalog/tests/test_describe.py)")
 
 
 if __name__ == "__main__":

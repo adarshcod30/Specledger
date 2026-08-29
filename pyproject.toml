@@ -9,7 +9,7 @@ description = "Evidence-gated product-data extraction: every published value cit
 readme = "README.md"
 license = { text = "MIT" }
 requires-python = ">=3.11"
-authors = [{ name = "Team Unisol" }]
+authors = [{ name = "Adarsh Dwivedi" }]
 dependencies = [
     "numpy>=1.26",
     "pint>=0.23",
@@ -28,7 +28,7 @@ calibration = ["scikit-learn>=1.4"]
 dev = ["pytest>=8"]
 
 [project.urls]
-Repository = "https://github.com/adarshcod30/Unisol"
+Repository = "https://github.com/adarshcod30/specledger"
 
 [tool.setuptools.packages.find]
 include = ["specledger*"]

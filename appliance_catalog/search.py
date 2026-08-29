@@ -20,7 +20,7 @@ from urllib.parse import unquote
 
 import httpx
 
-from unihack.source import USER_AGENT, BRAND_DOMAINS
+from appliance_catalog.source import USER_AGENT, BRAND_DOMAINS
 
 # Match on the brand's core domain token (e.g. "whirlpool" from
 # "www.whirlpool.com"), not the full domain string -- a search result can

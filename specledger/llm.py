@@ -108,7 +108,7 @@ class BedrockBackend:
     def call(self, prompt: str, temperature: float, *, system: str | None = None,
              tool_name: str | None = None, tool_desc: str | None = None,
              tool_schema: dict | None = None) -> dict | None:
-        # Overrides let a different domain (e.g. unihack/extract.py) supply its
+        # Overrides let a different domain (e.g. appliance_catalog/extract.py) supply its
         # own system prompt and tool schema over this same Converse-API
         # plumbing, instead of forking a second copy of the credential/retry
         # handling. Every default preserves SpecLedger's own existing calls.

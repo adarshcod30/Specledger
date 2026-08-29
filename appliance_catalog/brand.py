@@ -45,10 +45,11 @@ _VERIFIED = {
                             "whirlpool.com", verified=True),
 }
 
-# Best-effort defaults for the other brands present in the 1000-item sample.
+# Best-effort defaults for the other brands present in the sample catalog.
 # manufacturer_name defaults to "{Brand} Corporation"-style conventions that are
-# publicly well known, but is NOT checked against Unilog's approved list, so it
-# is marked unverified and the pipeline scores it at reduced confidence.
+# publicly well known, but is NOT checked against a manufacturer-of-record's
+# approved brand list, so it is marked unverified and the pipeline scores it
+# at reduced confidence.
 _DEFAULTS = {
     "GE": BrandStyle("GE®", "GE Appliances, a Haier company",
                      "geappliances.com", verified=False),
