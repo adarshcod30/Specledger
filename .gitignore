@@ -63,3 +63,9 @@ Thumbs.db
 
 # --- local tooling config, not shared ---
 .claude/
+
+# local agent and editor files, never committed
+.claude.json
+CLAUDE.local.md
+CLAUDE.md
+AGENTS.md
