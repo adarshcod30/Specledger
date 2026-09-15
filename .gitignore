@@ -62,3 +62,6 @@ Thumbs.db
 *.swp
 
 # --- local tooling config, not shared ---
+
+# secrets, build output and local noise
+.env.local
